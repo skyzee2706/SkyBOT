@@ -16,8 +16,10 @@ Buat raffle dari web → bot kirim giveaway ke Discord → peserta klik **Enter*
 - **Role pengelola** (mis. `@CM`): member dengan role ini bisa pakai web tanpa permission Manage Server
 - Embed giveaway + tombol **Enter** & **Cek status saya** di Discord
 - Syarat: wajib role, role dilarang, umur akun Discord minimal, submit wallet EVM/Solana (1 wallet = 1 peserta)
-- **Task X**: peserta menghubungkan akun X (1 akun X = 1 akun Discord), lalu klik tombol Follow / Like / Retweet.
-  Task **tidak dicek otomatis** — username X peserta tampil di dashboard untuk dicek manual.
+- **Task X**: peserta menghubungkan akun X (1 akun X = 1 akun Discord) lewat tombol **Connect X**, lalu klik tombol
+  Follow / Like / Retweet / Quote. Untuk Quote, peserta wajib mengirim link quote dari akun X yang terhubung.
+  Task **tidak dicek otomatis** — username X & link quote peserta tampil di dashboard untuk dicek manual.
+- Semua teks web & bot dalam bahasa Inggris
 - Undian acak (crypto), **syarat Discord dicek ulang saat undian** — yang keluar server / lepas role otomatis didiskualifikasi & diganti
 - Beri role ke pemenang, reroll, diskualifikasi manual, akhiri lebih awal, batalkan
 - Export peserta / pemenang ke CSV (bisa dibuka di Google Sheets)

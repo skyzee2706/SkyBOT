@@ -13,11 +13,11 @@ export function GuildsPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-bold">Pilih Server</h1>
-      <p className="mb-6 text-sm text-zinc-400">Server tempat kamu admin (Manage Server) atau punya role pengelola raffle.</p>
+      <h1 className="mb-1 text-2xl font-bold">Select a Server</h1>
+      <p className="mb-6 text-sm text-zinc-400">Servers where you're an admin (Manage Server) or have a raffle manager role.</p>
       <ErrorBox error={error} />
       {!guilds && !error && <Loading />}
-      {guilds?.length === 0 && <p className="text-zinc-400">Kamu belum mengelola server apa pun.</p>}
+      {guilds?.length === 0 && <p className="text-zinc-400">You don't manage any servers yet.</p>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {guilds?.map((g) => {
           const icon = guildIcon(g);
@@ -33,7 +33,7 @@ export function GuildsPage() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{g.name}</div>
                 <div className={`text-xs ${g.botPresent ? "text-emerald-400" : "text-zinc-500"}`}>
-                  {g.botPresent ? "Bot aktif → kelola raffle" : "Bot belum ada → klik untuk invite"}
+                  {g.botPresent ? "Bot active → manage raffles" : "Bot not added → click to invite"}
                 </div>
               </div>
             </>
@@ -51,7 +51,7 @@ export function GuildsPage() {
         })}
       </div>
       {guilds?.some((g) => !g.botPresent) && (
-        <p className="mt-6 text-xs text-zinc-500">Setelah invite bot, refresh halaman ini (daftar di-cache ±1 menit).</p>
+        <p className="mt-6 text-xs text-zinc-500">After inviting the bot, refresh this page (the list is cached for about 1 minute).</p>
       )}
     </div>
   );

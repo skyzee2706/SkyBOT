@@ -7,13 +7,13 @@ export function ErrorBox({ error }: { error: string | null }) {
 }
 
 export function Loading() {
-  return <div className="py-10 text-center text-zinc-500">Memuat...</div>;
+  return <div className="py-10 text-center text-zinc-500">Loading...</div>;
 }
 
 const STATUS: Record<RaffleStatus, { label: string; cls: string }> = {
-  ACTIVE: { label: "Aktif", cls: "bg-indigo-500/15 text-indigo-300" },
-  ENDED: { label: "Selesai", cls: "bg-emerald-500/15 text-emerald-300" },
-  CANCELLED: { label: "Dibatalkan", cls: "bg-zinc-700/40 text-zinc-400" },
+  ACTIVE: { label: "Active", cls: "bg-indigo-500/15 text-indigo-300" },
+  ENDED: { label: "Ended", cls: "bg-emerald-500/15 text-emerald-300" },
+  CANCELLED: { label: "Cancelled", cls: "bg-zinc-700/40 text-zinc-400" },
 };
 
 export function StatusBadge({ status }: { status: RaffleStatus }) {
@@ -32,13 +32,13 @@ export function Field({ label, hint, children }: { label: string; hint?: string;
 }
 
 export const formatDate = (iso: string) =>
-  new Date(iso).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" });
+  new Date(iso).toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" });
 
 export const roleColor = (color: number) => (color ? `#${color.toString(16).padStart(6, "0")}` : "#a1a1aa");
 
 export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: string[]; onChange: (v: string[]) => void }) {
   const toggle = (id: string) => onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
-  if (roles.length === 0) return <p className="hint">Server ini belum punya role.</p>;
+  if (roles.length === 0) return <p className="hint">This server has no roles yet.</p>;
   return (
     <div className="flex max-h-40 flex-wrap gap-2 overflow-y-auto rounded-lg border border-zinc-800 p-2">
       {roles.map((r) => {

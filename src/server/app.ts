@@ -26,11 +26,11 @@ const onError: ErrorRequestHandler = (err, _req, res, _next) => {
     return;
   }
   if (err?.status === 401) {
-    res.status(401).json({ error: "Sesi Discord kamu sudah habis, silakan login ulang." });
+    res.status(401).json({ error: "Your Discord session has expired, please log in again." });
     return;
   }
   console.error("[api] error", err);
-  res.status(500).json({ error: "Terjadi error di server." });
+  res.status(500).json({ error: "Something went wrong on the server." });
 };
 app.use(onError);
 

@@ -15,7 +15,7 @@ const receiver =
 export async function scheduleDraw(raffle: Pick<Raffle, "id" | "endsAt">) {
   if (isLocal) return; // lokal: ditangani ticker di dev.ts
   if (!qstash) {
-    console.warn("[schedule] QSTASH_TOKEN belum diisi — undian hanya jalan lewat cron harian / saat ada interaksi");
+    console.warn("[schedule] QSTASH_TOKEN is not set — draws will only run via the daily cron or on interaction");
     return;
   }
   const at = Math.min(raffle.endsAt.getTime(), Date.now() + MAX_DELAY_MS);

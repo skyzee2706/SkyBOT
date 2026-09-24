@@ -41,6 +41,7 @@ export type Raffle = {
   xTweetId: string | null;
   xLike: boolean;
   xRetweet: boolean;
+  xQuote: boolean;
   createdAt: string;
   entryCount?: number;
 };
@@ -59,6 +60,7 @@ export type Entry = {
   username: string;
   wallet: string | null;
   xUsername: string | null;
+  xQuoteUrl: string | null;
   status: "ENTERED" | "WON" | "DISQUALIFIED";
   note: string | null;
   createdAt: string;

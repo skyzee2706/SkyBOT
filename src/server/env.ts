@@ -1,16 +1,16 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const required = (name: string) => z.string().trim().min(1, `${name} belum diisi`);
+const required = (name: string) => z.string().trim().min(1, `${name} is not set`);
 // Nilai yang berisi spasi biasanya tanda beberapa baris .env ter-paste jadi satu
 const noSpaces = (name: string) =>
-  required(name).refine((v) => !/\s/.test(v), `${name} berisi spasi — kemungkinan beberapa baris ter-paste jadi satu`);
+  required(name).refine((v) => !/\s/.test(v), `${name} contains spaces — several lines were probably pasted as one`);
 
 const schema = z.object({
-  DISCORD_CLIENT_ID: required("DISCORD_CLIENT_ID").regex(/^\d{17,20}$/, "DISCORD_CLIENT_ID harus berupa angka saja (Application ID)"),
+  DISCORD_CLIENT_ID: required("DISCORD_CLIENT_ID").regex(/^\d{17,20}$/, "DISCORD_CLIENT_ID must contain digits only (Application ID)"),
   DISCORD_CLIENT_SECRET: noSpaces("DISCORD_CLIENT_SECRET"),
   DISCORD_BOT_TOKEN: noSpaces("DISCORD_BOT_TOKEN"),
-  DISCORD_PUBLIC_KEY: required("DISCORD_PUBLIC_KEY").regex(/^[0-9a-f]{64}$/i, "DISCORD_PUBLIC_KEY harus 64 karakter hex (Public Key)"),
+  DISCORD_PUBLIC_KEY: required("DISCORD_PUBLIC_KEY").regex(/^[0-9a-f]{64}$/i, "DISCORD_PUBLIC_KEY must be 64 hex characters (Public Key)"),
   DATABASE_URL: required("DATABASE_URL"),
   PUBLIC_URL: z.string().url().default("http://localhost:5173"),
   // Upstash QStash: menjadwalkan undian tepat waktu. Opsional saat development lokal.
@@ -29,7 +29,7 @@ const schema = z.object({
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) {
   const msg = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");
-  throw new Error(`[ENV] Ada yang belum diisi:\n${msg}\nLokal: salin .env.example jadi .env. Vercel: isi di Project Settings > Environment Variables.`);
+  throw new Error(`[ENV] Invalid or missing environment variables:\n${msg}\nLocal: copy .env.example to .env. Vercel: set them in Project Settings > Environment Variables.`);
 }
 
 export const env = { ...parsed.data, PUBLIC_URL: parsed.data.PUBLIC_URL.replace(/\/$/, "") };

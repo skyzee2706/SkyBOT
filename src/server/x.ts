@@ -84,3 +84,14 @@ export const intentFollow = (username: string) => `https://x.com/intent/follow?s
 export const intentLike = (tweetId: string) => `https://x.com/intent/like?tweet_id=${tweetId}`;
 export const intentRetweet = (tweetId: string) => `https://x.com/intent/retweet?tweet_id=${tweetId}`;
 export const tweetUrl = (tweetId: string) => `https://x.com/i/status/${tweetId}`;
+// Membuka composer X dengan link post target → otomatis jadi quote post.
+export const intentQuote = (tweetId: string) => `https://x.com/intent/post?url=${enc(tweetUrl(tweetId))}`;
+
+// Validasi link quote tanpa API: format harus link post X, dari akun X yang terhubung, dan bukan post target itu sendiri.
+export function parseQuoteUrl(raw: string, linkedUsername: string, targetTweetId: string): string | null {
+  const m = raw.trim().match(/^https?:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/([A-Za-z0-9_]{1,15})\/status(?:es)?\/(\d+)/i);
+  if (!m) return null;
+  const [, username, id] = m;
+  if (username.toLowerCase() !== linkedUsername.toLowerCase() || id === targetTweetId) return null;
+  return `https://x.com/${username}/status/${id}`;
+}

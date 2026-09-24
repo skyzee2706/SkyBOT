@@ -20,7 +20,7 @@ export function App() {
     setMe(null);
   };
 
-  if (me === undefined) return <div className="p-10 text-center text-zinc-500">Memuat...</div>;
+  if (me === undefined) return <div className="p-10 text-center text-zinc-500">Loading...</div>;
   if (me === null) return <Landing />;
 
   const avatar = avatarUrl(me);
@@ -35,7 +35,7 @@ export function App() {
             {avatar && <img src={avatar} className="h-7 w-7 rounded-full" alt="" />}
             <span className="hidden sm:inline text-zinc-300">{me.username}</span>
             <button onClick={logout} className="text-zinc-400 hover:text-zinc-200">
-              Keluar
+              Log out
             </button>
           </div>
         </div>
@@ -46,7 +46,7 @@ export function App() {
           <Route path="/g/:guildId" element={<GuildPage />} />
           <Route path="/g/:guildId/new" element={<CreateRafflePage />} />
           <Route path="/r/:id" element={<RafflePage />} />
-          <Route path="*" element={<p className="text-zinc-400">Halaman tidak ditemukan.</p>} />
+          <Route path="*" element={<p className="text-zinc-400">Page not found.</p>} />
         </Routes>
       </main>
     </div>
@@ -59,10 +59,11 @@ function Landing() {
       <div className="mb-4 text-6xl">🎟️</div>
       <h1 className="mb-3 text-4xl font-bold tracking-tight">Raffle Bot</h1>
       <p className="mb-8 max-w-md text-zinc-400">
-        Buat raffle dari web, bot otomatis kirim giveaway ke Discord, cek syarat peserta, dan undi pemenang secara adil.
+        Create raffles on the web, post giveaways to Discord automatically, check entry requirements and draw winners
+        fairly.
       </p>
       <a href="/api/auth/login" className="btn btn-primary px-6 py-3 text-base">
-        Login dengan Discord
+        Log in with Discord
       </a>
     </div>
   );

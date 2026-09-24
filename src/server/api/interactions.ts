@@ -14,7 +14,7 @@ import {
 } from "discord.js";
 import { rest } from "../discord.js";
 import { env } from "../env.js";
-import { enterRaffle, entryStatus, startXTasks, type Entrant, type Reply } from "../raffle/service.js";
+import { connectXReply, enterRaffle, entryStatus, startXTasks, type Entrant, type Reply } from "../raffle/service.js";
 import { readRawBody } from "./rawBody.js";
 
 const publicKey = createPublicKey({
@@ -49,12 +49,12 @@ async function finish(i: APIInteraction, work: () => Promise<Reply>) {
     reply = await work();
   } catch (e) {
     console.error("[interaction] error", e);
-    reply = "⚠️ Terjadi error, coba lagi sebentar.";
+    reply = "⚠️ Something went wrong, please try again in a moment.";
   }
   const body = typeof reply === "string" ? { content: reply, components: [] } : { components: [], ...reply };
   await rest
     .patch(Routes.webhookMessage(i.application_id, i.token), { body, auth: false })
-    .catch((e) => console.error("[interaction] gagal membalas", e));
+    .catch((e) => console.error("[interaction] failed to reply", e));
 }
 
 function findInputValue(components: unknown, customId: string): string | undefined {
@@ -67,10 +67,45 @@ function findInputValue(components: unknown, customId: string): string | undefin
   return undefined;
 }
 
-const deferredEphemeral = {
-  type: InteractionResponseType.DeferredChannelMessageWithSource,
-  data: { flags: MessageFlags.Ephemeral },
-};
+const textInput = (customId: string, label: string, placeholder: string, min: number, max: number) => ({
+  type: ComponentType.ActionRow,
+  components: [
+    {
+      type: ComponentType.TextInput,
+      custom_id: customId,
+      label,
+      placeholder,
+      style: TextInputStyle.Short,
+      min_length: min,
+      max_length: max,
+      required: true,
+    },
+  ],
+});
+
+// Form yang muncul di Discord: link quote dan/atau wallet.
+function entryModal(raffleId: string, walletType: string, needsQuote: boolean) {
+  const components = [];
+  if (needsQuote) {
+    components.push(textInput("quote", "Link to your quote post", "https://x.com/yourname/status/...", 20, 200));
+  }
+  if (walletType !== "NONE") {
+    components.push(
+      walletType === "EVM"
+        ? textInput("wallet", "EVM wallet address", "0x...", 42, 42)
+        : textInput("wallet", "Solana wallet address", "Your Solana address", 32, 44),
+    );
+  }
+  return {
+    type: InteractionResponseType.Modal,
+    data: { custom_id: `raffle:submit:${raffleId}`, title: "Enter Raffle", components },
+  };
+}
+
+const ephemeral = (content: string) => ({
+  type: InteractionResponseType.ChannelMessageWithSource,
+  data: { content, flags: MessageFlags.Ephemeral },
+});
 
 export const interactionsRouter = Router();
 
@@ -88,65 +123,54 @@ interactionsRouter.post("/", async (req, res) => {
   }
 
   if (!i.member || !("data" in i) || !i.data || !("custom_id" in i.data) || !i.data.custom_id.startsWith("raffle:")) {
-    res.json({ type: InteractionResponseType.ChannelMessageWithSource, data: { content: "Tidak dikenal.", flags: MessageFlags.Ephemeral } });
+    res.json(ephemeral("Unknown action."));
     return;
   }
   const gi = i as GuildInteraction;
-  const [, action, raffleId, walletType, xFlag] = gi.data.custom_id.split(":");
+  const [, action, raffleId, walletType = "NONE", flag] = gi.data.custom_id.split(":");
   const isButton = i.type === InteractionType.MessageComponent;
-  const needsWallet = !!walletType && walletType !== "NONE";
+  const needsWallet = walletType !== "NONE";
 
-  // Raffle dengan task X: tampilkan task dulu. Tanpa task X: langsung form wallet (kalau perlu).
-  // Tombol "confirm" ada di bawah daftar task, setelah itu baru form wallet.
-  if (isButton && needsWallet && ((action === "enter" && xFlag !== "X") || action === "confirm")) {
-    // Form wallet harus jadi respons pertama (maks 3 detik), jadi langsung dikirim tanpa query database.
-    res.json({
-      type: InteractionResponseType.Modal,
-      data: {
-        custom_id: `raffle:wallet:${raffleId}`,
-        title: "Masuk Raffle",
-        components: [
-          {
-            type: ComponentType.ActionRow,
-            components: [
-              {
-                type: ComponentType.TextInput,
-                custom_id: "wallet",
-                label: walletType === "EVM" ? "Alamat wallet EVM (0x...)" : "Alamat wallet Solana",
-                style: TextInputStyle.Short,
-                min_length: 32,
-                max_length: 44,
-                required: true,
-              },
-            ],
-          },
-        ],
-      },
-    });
+  // Form (modal) harus jadi respons pertama (maks 3 detik), jadi dikirim langsung tanpa query database.
+  // Enter tanpa task X → langsung form wallet. Dengan task X → form muncul setelah "Done, enter me".
+  if (isButton && action === "enter" && flag !== "X" && needsWallet) {
+    res.json(entryModal(raffleId, walletType, false));
+    return;
+  }
+  if (isButton && action === "confirm" && (needsWallet || flag === "Q")) {
+    res.json(entryModal(raffleId, walletType, flag === "Q"));
     return;
   }
 
   let work: (() => Promise<Reply>) | null = null;
   let updateSameMessage = false;
   if (isButton && action === "enter") {
-    work = xFlag === "X" ? () => startXTasks(raffleId, entrantOf(gi)) : () => enterRaffle(raffleId, entrantOf(gi));
+    work = flag === "X" ? () => startXTasks(raffleId, entrantOf(gi)) : () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "confirm") {
     // Tombol ada di pesan daftar task (ephemeral) — hasilnya menggantikan pesan itu.
     updateSameMessage = true;
     work = () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "status") {
     work = () => entryStatus(raffleId, gi.member.user.id);
-  } else if (i.type === InteractionType.ModalSubmit && action === "wallet") {
-    const wallet = findInputValue((gi as APIModalSubmitInteraction).data.components, "wallet") ?? "";
-    work = () => enterRaffle(raffleId, entrantOf(gi), wallet);
+  } else if (isButton && action === "connectx") {
+    work = () => connectXReply(gi.member.user.id);
+  } else if (i.type === InteractionType.ModalSubmit && (action === "submit" || action === "wallet")) {
+    const fields = (gi as APIModalSubmitInteraction).data.components;
+    const wallet = findInputValue(fields, "wallet");
+    const quoteUrl = findInputValue(fields, "quote");
+    work = () => enterRaffle(raffleId, entrantOf(gi), { wallet, quoteUrl });
   }
 
   if (!work) {
-    res.json({ type: InteractionResponseType.ChannelMessageWithSource, data: { content: "Aksi tidak dikenal.", flags: MessageFlags.Ephemeral } });
+    res.json(ephemeral("Unknown action."));
     return;
   }
 
   // Balas "sedang diproses" dulu (Discord cuma kasih 3 detik), lalu kerjakan di belakang layar.
-  res.json(updateSameMessage ? { type: InteractionResponseType.DeferredMessageUpdate } : deferredEphemeral);
+  res.json(
+    updateSameMessage
+      ? { type: InteractionResponseType.DeferredMessageUpdate }
+      : { type: InteractionResponseType.DeferredChannelMessageWithSource, data: { flags: MessageFlags.Ephemeral } },
+  );
   waitUntil(finish(i, work));
 });

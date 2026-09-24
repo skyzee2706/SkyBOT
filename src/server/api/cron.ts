@@ -11,7 +11,7 @@ export const cronRouter = Router();
 cronRouter.post("/draw", async (req, res) => {
   const body = await readRawBody(req);
   if (!(await verifyQStash(req.header("upstash-signature"), body))) {
-    res.status(401).json({ error: "signature tidak valid" });
+    res.status(401).json({ error: "invalid signature" });
     return;
   }
   const { raffleId } = JSON.parse(body) as { raffleId: string };

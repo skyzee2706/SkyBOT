@@ -6,9 +6,9 @@ import { ErrorBox, formatDate, Loading, StatusBadge } from "../components";
 type Filter = "ALL" | Entry["status"];
 
 const ENTRY_STATUS: Record<Entry["status"], { label: string; cls: string }> = {
-  ENTERED: { label: "Terdaftar", cls: "text-zinc-400" },
-  WON: { label: "🏆 Menang", cls: "text-emerald-400" },
-  DISQUALIFIED: { label: "Diskualifikasi", cls: "text-red-400" },
+  ENTERED: { label: "Entered", cls: "text-zinc-400" },
+  WON: { label: "🏆 Won", cls: "text-emerald-400" },
+  DISQUALIFIED: { label: "Disqualified", cls: "text-red-400" },
 };
 
 export function RafflePage() {
@@ -42,6 +42,7 @@ export function RafflePage() {
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
   const { raffle, entries } = data;
   const hasX = raffle.xFollowUsernames.length > 0 || !!raffle.xTweetId;
+  const hasQuote = raffle.xQuote && !!raffle.xTweetId;
 
   const counts = {
     ALL: entries.length,
@@ -60,10 +61,17 @@ export function RafflePage() {
         e.xUsername?.toLowerCase().includes(q)),
   );
 
+  const xTasks = [
+    ...raffle.xFollowUsernames.map((u) => `follow @${u}`),
+    raffle.xLike && "like",
+    raffle.xRetweet && "retweet",
+    raffle.xQuote && "quote",
+  ].filter(Boolean);
+
   return (
     <div>
       <Link to={`/g/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
-        ← Kembali ke server
+        ← Back to server
       </Link>
       <ErrorBox error={error} />
 
@@ -76,26 +84,23 @@ export function RafflePage() {
           </div>
           {raffle.description && <p className="mb-3 whitespace-pre-wrap text-sm text-zinc-400">{raffle.description}</p>}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
-            <span>{raffle.winnerCount} pemenang</span>
-            <span>{entries.length} peserta</span>
             <span>
-              {raffle.status === "ACTIVE" ? "Berakhir" : "Selesai"} {formatDate(raffle.endedAt ?? raffle.endsAt)}
+              {raffle.winnerCount} winner{raffle.winnerCount > 1 ? "s" : ""}
             </span>
-            {raffle.walletType !== "NONE" && <span>Wallet {raffle.walletType}</span>}
+            <span>
+              {entries.length} entr{entries.length === 1 ? "y" : "ies"}
+            </span>
+            <span>
+              {raffle.status === "ACTIVE" ? "Ends" : "Ended"} {formatDate(raffle.endedAt ?? raffle.endsAt)}
+            </span>
+            {raffle.walletType !== "NONE" && <span>{raffle.walletType} wallet</span>}
           </div>
           {hasX && (
             <div className="mt-2 text-sm text-zinc-400">
-              Task X:{" "}
-              {[
-                ...raffle.xFollowUsernames.map((u) => `follow @${u}`),
-                raffle.xLike && "like",
-                raffle.xRetweet && "retweet",
-              ]
-                .filter(Boolean)
-                .join(", ")}
+              X tasks: {xTasks.join(", ")}
               {raffle.xTweetId && (
                 <a href={`https://x.com/i/status/${raffle.xTweetId}`} target="_blank" rel="noreferrer" className="ml-2 text-indigo-400 hover:underline">
-                  lihat post ↗
+                  view post ↗
                 </a>
               )}
             </div>
@@ -107,7 +112,7 @@ export function RafflePage() {
               rel="noreferrer"
               className="mt-3 inline-block text-sm text-indigo-400 hover:underline"
             >
-              Lihat pesan di Discord ↗
+              View message in Discord ↗
             </a>
           )}
         </div>
@@ -117,34 +122,34 @@ export function RafflePage() {
         {raffle.status === "ACTIVE" &&
           (confirm ? (
             <div className="flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm">
-              {confirm === "end" ? "Akhiri & undi sekarang?" : "Batalkan raffle ini?"}
+              {confirm === "end" ? "End and draw winners now?" : "Cancel this raffle?"}
               <button className="btn btn-primary px-3 py-1" disabled={busy} onClick={() => act(`/${confirm}`)}>
-                Ya
+                Yes
               </button>
               <button className="btn btn-ghost px-3 py-1" onClick={() => setConfirm(null)}>
-                Tidak
+                No
               </button>
             </div>
           ) : (
             <>
               <button className="btn btn-primary" disabled={busy} onClick={() => setConfirm("end")}>
-                Akhiri & Undi Sekarang
+                End & Draw Now
               </button>
               <button className="btn btn-danger" disabled={busy} onClick={() => setConfirm("cancel")}>
-                Batalkan
+                Cancel Raffle
               </button>
             </>
           ))}
         {raffle.status === "ENDED" && (
           <button className="btn btn-primary" disabled={busy || counts.ENTERED === 0} onClick={() => act("/reroll", { count: 1 })}>
-            {busy ? "Mengundi..." : "🔁 Reroll 1 Pemenang"}
+            {busy ? "Drawing..." : "🔁 Reroll 1 Winner"}
           </button>
         )}
         <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.csv`}>
-          Export Peserta (CSV)
+          Export Entries (CSV)
         </a>
         <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.csv?winners=1`}>
-          Export Pemenang (CSV)
+          Export Winners (CSV)
         </a>
       </div>
 
@@ -157,15 +162,15 @@ export function RafflePage() {
                 onClick={() => setFilter(f)}
                 className={`rounded-lg px-3 py-1.5 text-sm ${filter === f ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
               >
-                {f === "ALL" ? "Semua" : ENTRY_STATUS[f].label} ({counts[f]})
+                {f === "ALL" ? "All" : ENTRY_STATUS[f].label} ({counts[f]})
               </button>
             ))}
           </div>
-          <input className="input sm:max-w-60" placeholder="Cari username / X / wallet" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="input sm:max-w-60" placeholder="Search username / X / wallet" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
 
         {shown.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">Belum ada data.</p>
+          <p className="py-6 text-center text-sm text-zinc-500">No entries yet.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -173,9 +178,10 @@ export function RafflePage() {
                 <tr>
                   <th className="py-2 pr-4">User</th>
                   {hasX && <th className="py-2 pr-4">X</th>}
+                  {hasQuote && <th className="py-2 pr-4">Quote</th>}
                   {raffle.walletType !== "NONE" && <th className="py-2 pr-4">Wallet</th>}
                   <th className="py-2 pr-4">Status</th>
-                  <th className="py-2 pr-4">Masuk</th>
+                  <th className="py-2 pr-4">Entered</th>
                   <th className="py-2" />
                 </tr>
               </thead>
@@ -195,6 +201,15 @@ export function RafflePage() {
                         )}
                       </td>
                     )}
+                    {hasQuote && (
+                      <td className="py-2 pr-4">
+                        {e.xQuoteUrl && (
+                          <a href={e.xQuoteUrl} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                            view ↗
+                          </a>
+                        )}
+                      </td>
+                    )}
                     {raffle.walletType !== "NONE" && <td className="py-2 pr-4 font-mono text-xs">{e.wallet}</td>}
                     <td className={`py-2 pr-4 ${ENTRY_STATUS[e.status].cls}`}>
                       {ENTRY_STATUS[e.status].label}
@@ -208,7 +223,7 @@ export function RafflePage() {
                           disabled={busy}
                           onClick={() => act(`/entries/${e.id}/disqualify`)}
                         >
-                          Diskualifikasi
+                          Disqualify
                         </button>
                       )}
                     </td>
@@ -216,7 +231,9 @@ export function RafflePage() {
                 ))}
               </tbody>
             </table>
-            {shown.length > 500 && <p className="mt-3 text-xs text-zinc-500">Menampilkan 500 dari {shown.length}. Pakai export CSV untuk semua data.</p>}
+            {shown.length > 500 && (
+              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}. Use CSV export for the full list.</p>
+            )}
           </div>
         )}
       </div>

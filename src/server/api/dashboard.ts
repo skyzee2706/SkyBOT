@@ -21,23 +21,23 @@ const getManagerRoleIds = async (guildId: string) =>
 // Boleh kelola raffle: Owner / Administrator / Manage Server, ATAU punya salah satu "role pengelola" (mis. @CM).
 async function requireManager(guildId: string, userId: string) {
   const [ctx, managerRoleIds] = await Promise.all([getGuildContext(guildId, userId), getManagerRoleIds(guildId)]);
-  if (!ctx) throw new HttpError(404, "Bot belum ada di server ini.");
+  if (!ctx) throw new HttpError(404, "The bot is not in this server.");
   const hasManagerRole = !!ctx.memberRoleIds?.some((id) => managerRoleIds.includes(id));
   if (!ctx.isAdmin && !hasManagerRole) {
-    throw new HttpError(403, "Kamu tidak punya akses. Minta admin menambahkan role kamu sebagai pengelola raffle.");
+    throw new HttpError(403, "You don't have access. Ask an admin to add your role as a raffle manager.");
   }
   return { ...ctx, managerRoleIds };
 }
 
 async function requireAdmin(guildId: string, userId: string) {
   const ctx = await requireManager(guildId, userId);
-  if (!ctx.isAdmin) throw new HttpError(403, "Hanya admin (Manage Server) yang bisa mengubah pengaturan ini.");
+  if (!ctx.isAdmin) throw new HttpError(403, "Only admins (Manage Server) can change this setting.");
   return ctx;
 }
 
 async function requireRaffle(raffleId: string, userId: string) {
   const raffle = await db.raffle.findUnique({ where: { id: raffleId } });
-  if (!raffle) throw new HttpError(404, "Raffle tidak ditemukan.");
+  if (!raffle) throw new HttpError(404, "Raffle not found.");
   await requireManager(raffle.guildId, userId);
   return raffle;
 }
@@ -150,12 +150,12 @@ dashboardRouter.put("/guilds/:guildId/settings", async (req, res) => {
 });
 
 const createSchema = z.object({
-  channelId: z.string().min(1, "Pilih channel"),
-  title: z.string().trim().min(1, "Judul wajib diisi").max(200),
+  channelId: z.string().min(1, "Please choose a channel"),
+  title: z.string().trim().min(1, "Title is required").max(200),
   description: z.string().max(3000).default(""),
-  imageUrl: z.union([z.literal(""), z.string().url("URL gambar tidak valid")]).optional(),
-  winnerCount: z.coerce.number().int().min(1).max(1000),
-  endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "Waktu selesai minimal 1 menit dari sekarang"),
+  imageUrl: z.union([z.literal(""), z.string().url("Invalid image URL")]).optional(),
+  winnerCount: z.coerce.number().int().min(1, "At least 1 winner").max(1000),
+  endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
   requiredRoleIds: z.array(z.string()).default([]),
   blockedRoleIds: z.array(z.string()).default([]),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
@@ -167,14 +167,15 @@ const createSchema = z.object({
       z
         .string()
         .transform((s) => s.trim().replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/^@/, "").split(/[/?]/)[0])
-        .refine((s) => /^[A-Za-z0-9_]{1,15}$/.test(s), "Username X tidak valid"),
+        .refine((s) => /^[A-Za-z0-9_]{1,15}$/.test(s), "Invalid X username"),
     )
-    .max(5, "Maksimal 5 akun untuk di-follow")
+    .max(5, "Maximum 5 accounts to follow")
     .default([]),
   // Link post X, mis. https://x.com/nama/status/1234567890
   xTweetUrl: z.string().trim().default(""),
   xLike: z.boolean().default(false),
   xRetweet: z.boolean().default(false),
+  xQuote: z.boolean().default(false),
 });
 
 dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
@@ -186,12 +187,12 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const { imageUrl, winnerRoleId, xTweetUrl, ...data } = parsed.data;
 
   let xTweetId: string | null = null;
-  if (data.xLike || data.xRetweet) {
+  if (data.xLike || data.xRetweet || data.xQuote) {
     xTweetId = xTweetUrl.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(xTweetUrl) ? xTweetUrl : null);
-    if (!xTweetId) throw new HttpError(400, "Link post X tidak valid (contoh: https://x.com/nama/status/123...)");
+    if (!xTweetId) throw new HttpError(400, "Invalid X post link (e.g. https://x.com/name/status/123...)");
   }
   if ((data.xFollowUsernames.length || xTweetId) && !xEnabled) {
-    throw new HttpError(400, "Fitur task X belum aktif. Admin perlu mengisi X_API_KEY dan X_API_SECRET.");
+    throw new HttpError(400, "X tasks are not enabled yet. The admin needs to set X_API_KEY and X_API_SECRET.");
   }
 
   const raffle = await db.raffle.create({
@@ -209,8 +210,8 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
     res.json(await publishRaffle(raffle));
   } catch (e) {
     await db.raffle.delete({ where: { id: raffle.id } });
-    console.error("[raffle] gagal publish", e);
-    throw new HttpError(400, "Bot gagal mengirim pesan ke channel itu. Pastikan bot bisa melihat channel & mengirim pesan di sana.");
+    console.error("[raffle] publish failed", e);
+    throw new HttpError(400, "The bot couldn't post in that channel. Make sure it can view the channel and send messages there.");
   }
 });
 
@@ -226,7 +227,7 @@ dashboardRouter.get("/raffles/:id", async (req, res) => {
 
 dashboardRouter.post("/raffles/:id/end", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  if (!(await endRaffle(raffle.id))) throw new HttpError(400, "Raffle ini sudah tidak aktif.");
+  if (!(await endRaffle(raffle.id))) throw new HttpError(400, "This raffle is no longer active.");
   res.json({ ok: true });
 });
 
@@ -239,13 +240,13 @@ dashboardRouter.post("/raffles/:id/cancel", async (req, res) => {
 dashboardRouter.post("/raffles/:id/reroll", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   const count = z.coerce.number().int().min(1).max(100).catch(1).parse(req.body?.count);
-  if (raffle.status !== "ENDED") throw new HttpError(400, "Reroll hanya untuk raffle yang sudah selesai.");
+  if (raffle.status !== "ENDED") throw new HttpError(400, "Reroll is only available for ended raffles.");
   res.json({ winners: await rerollRaffle(raffle.id, count) });
 });
 
 dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  const note = z.string().trim().max(200).catch("").parse(req.body?.note) || "Didiskualifikasi admin";
+  const note = z.string().trim().max(200).catch("").parse(req.body?.note) || "Disqualified by admin";
   await disqualifyEntry(raffle.id, param(req, "entryId"), note);
   res.json({ ok: true });
 });
@@ -265,8 +266,17 @@ dashboardRouter.get("/raffles/:id/export.csv", async (req, res) => {
     orderBy: { createdAt: "asc" },
   });
   const rows = [
-    ["discord_id", "username", "x_username", "wallet", "status", "note", "entered_at"],
-    ...entries.map((e) => [e.userId, e.username, e.xUsername, e.wallet, e.status, e.note, e.createdAt.toISOString()]),
+    ["discord_id", "username", "x_username", "x_quote_url", "wallet", "status", "note", "entered_at"],
+    ...entries.map((e) => [
+      e.userId,
+      e.username,
+      e.xUsername,
+      e.xQuoteUrl,
+      e.wallet,
+      e.status,
+      e.note,
+      e.createdAt.toISOString(),
+    ]),
   ];
   const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}${onlyWinners ? "_winners" : "_entries"}.csv`;
   res.setHeader("Content-Type", "text/csv; charset=utf-8");

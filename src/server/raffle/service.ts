@@ -3,7 +3,7 @@ import { Routes, type APIMessage } from "discord.js";
 import type { Raffle } from "@prisma/client";
 import { db, isUniqueViolation, uniqueTarget } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
-import { connectXUrl } from "../x.js";
+import { connectXUrl, parseQuoteUrl } from "../x.js";
 import { connectXComponents, hasXTasks, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
 import { checkRequirements, normalizeWallet } from "./requirements.js";
 import { scheduleDraw } from "./schedule.js";
@@ -62,8 +62,10 @@ export async function publishRaffle(raffle: Raffle) {
 
 export type Entrant = { userId: string; username: string; roleIds: string[] };
 export type Reply = string | { content: string; components?: unknown[] };
+export type Submission = { wallet?: string; quoteUrl?: string };
 
-const ENDED = "❌ Raffle ini sudah berakhir.";
+const ENDED = "❌ This raffle has already ended.";
+const ALREADY_ENTERED = "✅ You're already entered in this raffle.";
 
 // Ambil raffle aktif + cek syarat Discord. Mengembalikan pesan error kalau tidak bisa ikut.
 async function loadForEntry(raffleId: string, who: Entrant): Promise<Raffle | string> {
@@ -74,14 +76,25 @@ async function loadForEntry(raffleId: string, who: Entrant): Promise<Raffle | st
     return ENDED;
   }
   const errors = checkRequirements(raffle, who);
-  if (errors.length) return `❌ Kamu belum memenuhi syarat:\n${errors.map((e) => `• ${e}`).join("\n")}`;
+  if (errors.length) return `❌ You don't meet the requirements yet:\n${errors.map((e) => `• ${e}`).join("\n")}`;
   return raffle;
 }
 
 const notLinkedReply = (userId: string): Reply => ({
-  content: "🔗 Raffle ini punya task X. Hubungkan akun X kamu dulu (cukup sekali), lalu klik **Enter** lagi.",
+  content: "🔗 This raffle has X tasks. Connect your X account first (one-time only), then click **Enter** again.",
   components: connectXComponents(connectXUrl(userId)),
 });
+
+// Tombol "Connect X" di pesan raffle: tampilkan status akun X + link untuk (ganti) hubungkan.
+export async function connectXReply(userId: string): Promise<Reply> {
+  const xLink = await db.xLink.findUnique({ where: { discordId: userId } });
+  return {
+    content: xLink
+      ? `✅ Your X account is connected: **@${xLink.xUsername}**\nWant to use a different account? Click the button below.`
+      : "🔗 Connect your X account to join raffles with X tasks (one-time only).",
+    components: connectXComponents(connectXUrl(userId), xLink ? "Switch X account" : "Connect X account"),
+  };
+}
 
 // Langkah pertama raffle yang punya task X: pastikan akun X terhubung, lalu tampilkan tombol task.
 export async function startXTasks(raffleId: string, who: Entrant): Promise<Reply> {
@@ -91,54 +104,68 @@ export async function startXTasks(raffleId: string, who: Entrant): Promise<Reply
     db.xLink.findUnique({ where: { discordId: who.userId } }),
     db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId: who.userId } } }),
   ]);
-  if (existing) return "✅ Kamu sudah terdaftar di raffle ini.";
+  if (existing) return ALREADY_ENTERED;
   if (!xLink) return notLinkedReply(who.userId);
   return {
     content:
-      `Akun X: **@${xLink.xUsername}**\n` +
-      "1️⃣ Klik semua tombol task di bawah dan selesaikan di X\n" +
-      "2️⃣ Klik **Sudah semua, masukkan saya**",
+      `X account: **@${xLink.xUsername}**\n` +
+      "1️⃣ Click every task button below and complete it on X\n" +
+      (raffle.xQuote ? "2️⃣ Copy the link of your quote post\n3️⃣ Click **Done, enter me** and paste the link" : "2️⃣ Click **Done, enter me**"),
     components: xTaskComponents(raffle),
   };
 }
 
-export async function enterRaffle(raffleId: string, who: Entrant, walletRaw?: string): Promise<Reply> {
+export async function enterRaffle(raffleId: string, who: Entrant, input: Submission = {}): Promise<Reply> {
   const raffle = await loadForEntry(raffleId, who);
   if (typeof raffle === "string") return raffle;
 
   let xUsername: string | null = null;
+  let xQuoteUrl: string | null = null;
   if (hasXTasks(raffle)) {
     const xLink = await db.xLink.findUnique({ where: { discordId: who.userId } });
     if (!xLink) return notLinkedReply(who.userId);
     xUsername = xLink.xUsername;
+    if (raffle.xQuote && raffle.xTweetId) {
+      xQuoteUrl = parseQuoteUrl(input.quoteUrl ?? "", xLink.xUsername, raffle.xTweetId);
+      if (!xQuoteUrl) {
+        return `❌ Invalid quote link. It must be a link to your own post from **@${xLink.xUsername}**, e.g. \`https://x.com/${xLink.xUsername}/status/123...\``;
+      }
+    }
   }
 
   let wallet: string | null = null;
   if (raffle.walletType !== "NONE") {
-    wallet = normalizeWallet(raffle.walletType, walletRaw ?? "");
-    if (!wallet) return `❌ Alamat wallet ${raffle.walletType === "EVM" ? "EVM" : "Solana"} tidak valid.`;
+    wallet = normalizeWallet(raffle.walletType, input.wallet ?? "");
+    if (!wallet) return `❌ Invalid ${raffle.walletType === "EVM" ? "EVM" : "Solana"} wallet address.`;
   }
 
   try {
-    await db.entry.create({ data: { raffleId, userId: who.userId, username: who.username, wallet, xUsername } });
+    await db.entry.create({
+      data: { raffleId, userId: who.userId, username: who.username, wallet, xUsername, xQuoteUrl },
+    });
   } catch (e) {
     if (isUniqueViolation(e)) {
       return uniqueTarget(e).includes("wallet")
-        ? "❌ Wallet itu sudah dipakai peserta lain di raffle ini."
-        : "✅ Kamu sudah terdaftar di raffle ini.";
+        ? "❌ That wallet is already used by another entrant in this raffle."
+        : ALREADY_ENTERED;
     }
     throw e;
   }
 
-  await syncMessageThrottled(raffleId).catch((e) => console.error("[raffle] gagal update embed", e));
-  return `✅ Berhasil masuk raffle **${raffle.title}**! Semoga menang 🍀${wallet ? `\nWallet: \`${wallet}\`` : ""}`;
+  await syncMessageThrottled(raffleId).catch((e) => console.error("[raffle] failed to update embed", e));
+  return `✅ You're in **${raffle.title}**! Good luck 🍀${wallet ? `\nWallet: \`${wallet}\`` : ""}`;
 }
 
 export async function entryStatus(raffleId: string, userId: string) {
   const entry = await db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId } } });
-  if (!entry) return "Kamu belum masuk raffle ini.";
-  const label = { ENTERED: "🎟️ Terdaftar", WON: "🏆 MENANG!", DISQUALIFIED: "⛔ Didiskualifikasi" }[entry.status];
-  return `${label}${entry.wallet ? `\nWallet: \`${entry.wallet}\`` : ""}${entry.note ? `\nAlasan: ${entry.note}` : ""}`;
+  if (!entry) return "You haven't entered this raffle yet.";
+  const label = { ENTERED: "🎟️ Entered", WON: "🏆 YOU WON!", DISQUALIFIED: "⛔ Disqualified" }[entry.status];
+  return (
+    label +
+    (entry.xUsername ? `\nX: @${entry.xUsername}` : "") +
+    (entry.wallet ? `\nWallet: \`${entry.wallet}\`` : "") +
+    (entry.note ? `\nReason: ${entry.note}` : "")
+  );
 }
 
 function shuffle<T>(arr: T[]) {
@@ -160,9 +187,7 @@ async function pickWinners(raffle: Raffle, count: number): Promise<string[]> {
   for (const c of candidates) {
     if (winners.length >= count) break;
     const member = await fetchMember(raffle.guildId, c.userId);
-    const errors = member
-      ? checkRequirements(raffle, { userId: c.userId, roleIds: member.roles })
-      : ["Sudah keluar dari server"];
+    const errors = member ? checkRequirements(raffle, { userId: c.userId, roleIds: member.roles }) : ["Left the server"];
     if (errors.length) {
       await db.entry.update({ where: { id: c.id }, data: { status: "DISQUALIFIED", note: errors.join("; ") } });
       continue;
@@ -172,9 +197,9 @@ async function pickWinners(raffle: Raffle, count: number): Promise<string[]> {
     if (raffle.winnerRoleId) {
       await rest
         .put(Routes.guildMemberRole(raffle.guildId, c.userId, raffle.winnerRoleId), {
-          reason: `Menang raffle ${raffle.id}`,
+          reason: `Won raffle ${raffle.id}`,
         })
-        .catch((e) => console.warn(`[raffle] gagal kasih role pemenang ke ${c.userId}: ${e.message}`));
+        .catch((e) => console.warn(`[raffle] failed to give winner role to ${c.userId}: ${e.message}`));
     }
   }
   return winners;
@@ -218,11 +243,11 @@ export async function endRaffle(raffleId: string) {
   await announce(
     raffle,
     winners.length
-      ? `🎉 Raffle **${raffle.title}** selesai! Selamat kepada pemenang:\n`
-      : `Raffle **${raffle.title}** selesai, tapi tidak ada peserta yang memenuhi syarat.`,
+      ? `🎉 **${raffle.title}** has ended! Congratulations to the winners:\n`
+      : `**${raffle.title}** has ended, but no entrants met the requirements.`,
     winners,
-  ).catch((e) => console.error("[raffle] gagal mengumumkan pemenang", e));
-  console.log(`[raffle] ${raffleId} selesai, ${winners.length} pemenang`);
+  ).catch((e) => console.error("[raffle] failed to announce winners", e));
+  console.log(`[raffle] ${raffleId} ended, ${winners.length} winners`);
   return true;
 }
 
@@ -232,16 +257,16 @@ export async function endOverdueRaffles() {
     where: { status: "ACTIVE", endsAt: { lte: new Date() } },
     select: { id: true },
   });
-  for (const r of due) await endRaffle(r.id).catch((e) => console.error(`[raffle] gagal mengundi ${r.id}`, e));
+  for (const r of due) await endRaffle(r.id).catch((e) => console.error(`[raffle] failed to draw ${r.id}`, e));
   return due.length;
 }
 
 export async function rerollRaffle(raffleId: string, count: number) {
   const raffle = await db.raffle.findUniqueOrThrow({ where: { id: raffleId } });
-  if (raffle.status !== "ENDED") throw new Error("Reroll hanya bisa untuk raffle yang sudah selesai.");
+  if (raffle.status !== "ENDED") throw new Error("Reroll is only available for ended raffles.");
   const winners = await pickWinners(raffle, count);
   await refreshMessage(raffleId);
-  if (winners.length) await announce(raffle, `🔁 Reroll **${raffle.title}**! Pemenang tambahan:\n`, winners);
+  if (winners.length) await announce(raffle, `🔁 **${raffle.title}** reroll! Additional winners:\n`, winners);
   return winners;
 }
 
@@ -250,7 +275,7 @@ export async function cancelRaffle(raffleId: string) {
     where: { id: raffleId, status: "ACTIVE" },
     data: { status: "CANCELLED", endedAt: new Date() },
   });
-  if (!count) throw new Error("Raffle ini sudah tidak aktif.");
+  if (!count) throw new Error("This raffle is no longer active.");
   await refreshMessage(raffleId);
 }
 

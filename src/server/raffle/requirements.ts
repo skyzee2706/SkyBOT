@@ -15,16 +15,16 @@ type Check = (raffle: RequirementInput, ctx: CheckContext) => string | null;
 const checks: Check[] = [
   (r, ctx) => {
     const missing = r.requiredRoleIds.filter((id) => !ctx.roleIds.includes(id));
-    return missing.length ? `Kamu belum punya role: ${missing.map((id) => `<@&${id}>`).join(", ")}` : null;
+    return missing.length ? `Missing required role: ${missing.map((id) => `<@&${id}>`).join(", ")}` : null;
   },
   (r, ctx) => {
     const blocked = r.blockedRoleIds.filter((id) => ctx.roleIds.includes(id));
-    return blocked.length ? `Role ${blocked.map((id) => `<@&${id}>`).join(", ")} tidak boleh ikut raffle ini` : null;
+    return blocked.length ? `Role ${blocked.map((id) => `<@&${id}>`).join(", ")} is not allowed in this raffle` : null;
   },
   (r, ctx) => {
     if (!r.minAccountAgeDays) return null;
     const ageDays = (Date.now() - Number(SnowflakeUtil.timestampFrom(ctx.userId))) / 86_400_000;
-    return ageDays < r.minAccountAgeDays ? `Akun Discord kamu harus berumur minimal ${r.minAccountAgeDays} hari` : null;
+    return ageDays < r.minAccountAgeDays ? `Your Discord account must be at least ${r.minAccountAgeDays} days old` : null;
   },
 ];
 

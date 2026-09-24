@@ -37,7 +37,7 @@ authRouter.get("/login", (_req, res) => {
 authRouter.get("/callback", async (req, res) => {
   const { code, state } = req.query as Record<string, string | undefined>;
   if (!code || !state || state !== req.cookies.oauth_state) {
-    res.status(400).send("Login gagal (state tidak cocok). <a href='/'>Coba lagi</a>");
+    res.status(400).send("Login failed (state mismatch). <a href='/'>Try again</a>");
     return;
   }
   res.clearCookie("oauth_state");
@@ -54,8 +54,8 @@ authRouter.get("/callback", async (req, res) => {
     }),
   });
   if (!tokenRes.ok) {
-    console.error("[auth] tukar token gagal", tokenRes.status, await tokenRes.text());
-    res.status(400).send("Login gagal. Cek DISCORD_CLIENT_SECRET dan Redirect URL. <a href='/'>Kembali</a>");
+    console.error("[auth] token exchange failed", tokenRes.status, await tokenRes.text());
+    res.status(400).send("Login failed. Check DISCORD_CLIENT_SECRET and the Redirect URL. <a href='/'>Back</a>");
     return;
   }
   const token = (await tokenRes.json()) as { access_token: string; expires_in: number };
@@ -107,7 +107,7 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
   const sid = req.cookies.sid as string | undefined;
   const user = sid ? await loadSession(sid) : null;
   if (!user) {
-    res.status(401).json({ error: "Belum login" });
+    res.status(401).json({ error: "Not logged in" });
     return;
   }
   res.locals.user = user;

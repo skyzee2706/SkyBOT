@@ -15,10 +15,10 @@ export default async function handler(req: IncomingMessage, res: ServerResponse)
   const result = await loaded;
   if ("error" in result) {
     const e = result.error;
-    console.error("[startup] server gagal start", e);
+    console.error("[startup] server failed to start", e);
     res.statusCode = 500;
     res.setHeader("Content-Type", "text/plain; charset=utf-8");
-    res.end(`Server gagal start:\n\n${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
+    res.end(`Server failed to start:\n\n${e instanceof Error ? `${e.name}: ${e.message}` : String(e)}`);
     return;
   }
   result.app(req, res);
