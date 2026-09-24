@@ -20,6 +20,7 @@ export type Me = { id: string; username: string; avatar: string | null };
 export type GuildSummary = { id: string; name: string; icon: string | null; botPresent: boolean; inviteUrl: string };
 export type Role = { id: string; name: string; color: number; assignable: boolean };
 export type RaffleStatus = "ACTIVE" | "ENDED" | "CANCELLED";
+export type XPost = { tweetId: string; like: boolean; retweet: boolean; quote: boolean };
 export type Raffle = {
   id: string;
   guildId: string;
@@ -38,10 +39,7 @@ export type Raffle = {
   walletType: "NONE" | "EVM" | "SOL";
   winnerRoleId: string | null;
   xFollowUsernames: string[];
-  xTweetId: string | null;
-  xLike: boolean;
-  xRetweet: boolean;
-  xQuote: boolean;
+  xPosts: XPost[];
   createdAt: string;
   entryCount?: number;
 };
@@ -60,7 +58,7 @@ export type Entry = {
   username: string;
   wallet: string | null;
   xUsername: string | null;
-  xQuoteUrl: string | null;
+  xQuoteUrls: string[];
   status: "ENTERED" | "WON" | "DISQUALIFIED";
   note: string | null;
   createdAt: string;

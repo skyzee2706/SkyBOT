@@ -41,8 +41,9 @@ export function RafflePage() {
 
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
   const { raffle, entries } = data;
-  const hasX = raffle.xFollowUsernames.length > 0 || !!raffle.xTweetId;
-  const hasQuote = raffle.xQuote && !!raffle.xTweetId;
+  const posts = raffle.xPosts;
+  const hasX = raffle.xFollowUsernames.length > 0 || posts.length > 0;
+  const quoteCount = posts.filter((p) => p.quote).length;
 
   const counts = {
     ALL: entries.length,
@@ -61,12 +62,6 @@ export function RafflePage() {
         e.xUsername?.toLowerCase().includes(q)),
   );
 
-  const xTasks = [
-    ...raffle.xFollowUsernames.map((u) => `follow @${u}`),
-    raffle.xLike && "like",
-    raffle.xRetweet && "retweet",
-    raffle.xQuote && "quote",
-  ].filter(Boolean);
 
   return (
     <div>
@@ -96,13 +91,24 @@ export function RafflePage() {
             {raffle.walletType !== "NONE" && <span>{raffle.walletType} wallet</span>}
           </div>
           {hasX && (
-            <div className="mt-2 text-sm text-zinc-400">
-              X tasks: {xTasks.join(", ")}
-              {raffle.xTweetId && (
-                <a href={`https://x.com/i/status/${raffle.xTweetId}`} target="_blank" rel="noreferrer" className="ml-2 text-indigo-400 hover:underline">
-                  view post ↗
-                </a>
-              )}
+            <div className="mt-3 space-y-1 text-sm text-zinc-400">
+              <div className="font-medium text-zinc-300">X tasks</div>
+              {raffle.xFollowUsernames.map((u) => (
+                <div key={u}>
+                  • Follow{" "}
+                  <a href={`https://x.com/${u}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                    @{u}
+                  </a>
+                </div>
+              ))}
+              {posts.map((p, i) => (
+                <div key={p.tweetId}>
+                  • {[p.like && "Like", p.retweet && "Retweet", p.quote && "Quote"].filter(Boolean).join(" + ")}{" "}
+                  <a href={`https://x.com/i/status/${p.tweetId}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                    post #{i + 1} ↗
+                  </a>
+                </div>
+              ))}
             </div>
           )}
           {raffle.messageId && (
@@ -178,7 +184,7 @@ export function RafflePage() {
                 <tr>
                   <th className="py-2 pr-4">User</th>
                   {hasX && <th className="py-2 pr-4">X</th>}
-                  {hasQuote && <th className="py-2 pr-4">Quote</th>}
+                  {quoteCount > 0 && <th className="py-2 pr-4">Quote{quoteCount > 1 ? "s" : ""}</th>}
                   {raffle.walletType !== "NONE" && <th className="py-2 pr-4">Wallet</th>}
                   <th className="py-2 pr-4">Status</th>
                   <th className="py-2 pr-4">Entered</th>
@@ -201,13 +207,15 @@ export function RafflePage() {
                         )}
                       </td>
                     )}
-                    {hasQuote && (
+                    {quoteCount > 0 && (
                       <td className="py-2 pr-4">
-                        {e.xQuoteUrl && (
-                          <a href={e.xQuoteUrl} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
-                            view ↗
-                          </a>
-                        )}
+                        <div className="flex flex-wrap gap-2">
+                          {e.xQuoteUrls.map((url, n) => (
+                            <a key={url} href={url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                              {e.xQuoteUrls.length > 1 ? `#${n + 1}` : "view"} ↗
+                            </a>
+                          ))}
+                        </div>
                       </td>
                     )}
                     {raffle.walletType !== "NONE" && <td className="py-2 pr-4 font-mono text-xs">{e.wallet}</td>}

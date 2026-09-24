@@ -1,20 +1,20 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import type { Raffle } from "@prisma/client";
 import { intentFollow, intentLike, intentQuote, intentRetweet, tweetUrl } from "../x.js";
+import { getXPosts, hasXTasks, quotePosts } from "./xtasks.js";
+
+export { hasXTasks };
 
 const ts = (d: Date, style = "R") => `<t:${Math.floor(d.getTime() / 1000)}:${style}>`;
 
-type XTasks = Pick<Raffle, "xFollowUsernames" | "xTweetId" | "xLike" | "xRetweet" | "xQuote">;
-
-export const hasXTasks = (r: XTasks) =>
-  r.xFollowUsernames.length > 0 || (!!r.xTweetId && (r.xLike || r.xRetweet || r.xQuote));
-
-function xTaskLines(r: XTasks) {
+function xTaskLines(r: Raffle) {
   const lines = r.xFollowUsernames.map((u) => `Follow [@${u}](https://x.com/${u}) on X`);
-  if (r.xTweetId) {
-    const acts = [r.xLike && "Like", r.xRetweet && "Retweet", r.xQuote && "Quote"].filter(Boolean).join(" + ");
-    if (acts) lines.push(`${acts} [this post](${tweetUrl(r.xTweetId)})`);
-  }
+  const posts = getXPosts(r);
+  posts.forEach((p, i) => {
+    const acts = [p.like && "Like", p.retweet && "Retweet", p.quote && "Quote"].filter(Boolean).join(" + ");
+    const name = posts.length > 1 ? `post #${i + 1}` : "this post";
+    if (acts) lines.push(`${acts} [${name}](${tweetUrl(p.tweetId)})`);
+  });
   return lines;
 }
 
@@ -82,17 +82,25 @@ const link = (label: string, url: string) => new ButtonBuilder().setStyle(Button
 // Tombol task X (maks 5 per baris) + tombol konfirmasi.
 export function xTaskComponents(raffle: Raffle) {
   const tasks = raffle.xFollowUsernames.map((u) => link(`Follow @${u}`.slice(0, 80), intentFollow(u)));
-  if (raffle.xTweetId && raffle.xLike) tasks.push(link("❤️ Like", intentLike(raffle.xTweetId)));
-  if (raffle.xTweetId && raffle.xRetweet) tasks.push(link("🔁 Retweet", intentRetweet(raffle.xTweetId)));
-  if (raffle.xTweetId && raffle.xQuote) tasks.push(link("💬 Quote", intentQuote(raffle.xTweetId)));
+  const posts = getXPosts(raffle);
+  posts.forEach((p, i) => {
+    const n = posts.length > 1 ? ` #${i + 1}` : "";
+    if (p.like) tasks.push(link(`❤️ Like${n}`, intentLike(p.tweetId)));
+    if (p.retweet) tasks.push(link(`🔁 Retweet${n}`, intentRetweet(p.tweetId)));
+    if (p.quote) tasks.push(link(`💬 Quote${n}`, intentQuote(p.tweetId)));
+  });
 
+  // Maks 4 baris tombol task (20 tombol) + 1 baris konfirmasi = batas 5 baris Discord
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < tasks.length; i += 5) rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(tasks.slice(i, i + 5)));
+  for (let i = 0; i < Math.min(tasks.length, 20); i += 5) {
+    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(tasks.slice(i, i + 5)));
+  }
+  const quoteCount = quotePosts(raffle).length;
   rows.push(
     new ActionRowBuilder<ButtonBuilder>().addComponents(
       new ButtonBuilder()
-        // Flag Q = perlu form link quote
-        .setCustomId(`raffle:confirm:${raffle.id}:${raffle.walletType}:${raffle.xQuote && raffle.xTweetId ? "Q" : "-"}`)
+        // Q<n> = form perlu n link quote
+        .setCustomId(`raffle:confirm:${raffle.id}:${raffle.walletType}:${quoteCount ? `Q${quoteCount}` : "-"}`)
         .setLabel("✅ Done, enter me")
         .setStyle(ButtonStyle.Success),
     ),

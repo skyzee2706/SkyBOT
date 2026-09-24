@@ -84,10 +84,12 @@ const textInput = (customId: string, label: string, placeholder: string, min: nu
 });
 
 // Form yang muncul di Discord: link quote dan/atau wallet.
-function entryModal(raffleId: string, walletType: string, needsQuote: boolean) {
+// Discord membatasi 5 input per form; dashboard memastikan jumlah quote + wallet ≤ 5.
+function entryModal(raffleId: string, walletType: string, quoteCount: number) {
   const components = [];
-  if (needsQuote) {
-    components.push(textInput("quote", "Link to your quote post", "https://x.com/yourname/status/...", 20, 200));
+  for (let n = 1; n <= quoteCount; n++) {
+    const label = quoteCount > 1 ? `Link to your quote of post #${n}` : "Link to your quote post";
+    components.push(textInput(`quote${n}`, label, "https://x.com/yourname/status/...", 20, 200));
   }
   if (walletType !== "NONE") {
     components.push(
@@ -130,15 +132,17 @@ interactionsRouter.post("/", async (req, res) => {
   const [, action, raffleId, walletType = "NONE", flag] = gi.data.custom_id.split(":");
   const isButton = i.type === InteractionType.MessageComponent;
   const needsWallet = walletType !== "NONE";
+  // "Q3" = 3 link quote; "Q" (tombol versi lama) = 1
+  const quoteCount = flag?.startsWith("Q") ? Math.min(5, Number(flag.slice(1)) || 1) : 0;
 
   // Form (modal) harus jadi respons pertama (maks 3 detik), jadi dikirim langsung tanpa query database.
   // Enter tanpa task X → langsung form wallet. Dengan task X → form muncul setelah "Done, enter me".
   if (isButton && action === "enter" && flag !== "X" && needsWallet) {
-    res.json(entryModal(raffleId, walletType, false));
+    res.json(entryModal(raffleId, walletType, 0));
     return;
   }
-  if (isButton && action === "confirm" && (needsWallet || flag === "Q")) {
-    res.json(entryModal(raffleId, walletType, flag === "Q"));
+  if (isButton && action === "confirm" && (needsWallet || quoteCount)) {
+    res.json(entryModal(raffleId, walletType, quoteCount));
     return;
   }
 
@@ -157,8 +161,9 @@ interactionsRouter.post("/", async (req, res) => {
   } else if (i.type === InteractionType.ModalSubmit && (action === "submit" || action === "wallet")) {
     const fields = (gi as APIModalSubmitInteraction).data.components;
     const wallet = findInputValue(fields, "wallet");
-    const quoteUrl = findInputValue(fields, "quote");
-    work = () => enterRaffle(raffleId, entrantOf(gi), { wallet, quoteUrl });
+    const quoteUrls = [1, 2, 3, 4, 5].map((n) => findInputValue(fields, `quote${n}`));
+    quoteUrls[0] ??= findInputValue(fields, "quote"); // form versi lama
+    work = () => enterRaffle(raffleId, entrantOf(gi), { wallet, quoteUrls });
   }
 
   if (!work) {

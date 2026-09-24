@@ -2,51 +2,11 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type GuildDetail, type Raffle } from "../api";
 import { ErrorBox, Field, Loading, RolePicker } from "../components";
+import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
 
 // Nilai default untuk <input type="datetime-local"> (waktu lokal browser)
 const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
 
-const parseUsernames = (s: string) =>
-  s
-    .split(/[\s,]+/)
-    .map((u) => u.replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/^@/, "").split(/[/?]/)[0])
-    .filter(Boolean);
-
-const parseTweetId = (s: string) => s.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(s.trim()) ? s.trim() : null);
-
-// Preview tombol task yang akan dilihat peserta di Discord.
-function TaskPreview({ follows, tweetId, like, retweet, quote }: { follows: string[]; tweetId: string | null; like: boolean; retweet: boolean; quote: boolean }) {
-  const tasks: { label: string; url: string }[] = follows.map((u) => ({
-    label: `Follow @${u}`,
-    url: `https://x.com/intent/follow?screen_name=${encodeURIComponent(u)}`,
-  }));
-  if (tweetId && like) tasks.push({ label: "❤️ Like", url: `https://x.com/intent/like?tweet_id=${tweetId}` });
-  if (tweetId && retweet) tasks.push({ label: "🔁 Retweet", url: `https://x.com/intent/retweet?tweet_id=${tweetId}` });
-  if (tweetId && quote) {
-    tasks.push({
-      label: "💬 Quote",
-      url: `https://x.com/intent/post?url=${encodeURIComponent(`https://x.com/i/status/${tweetId}`)}`,
-    });
-  }
-  if (tasks.length === 0) return null;
-  return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-      <p className="mb-2 text-xs text-zinc-500">Task buttons entrants will see in Discord (click to test):</p>
-      <div className="flex flex-wrap gap-2">
-        {tasks.map((t) => (
-          <a key={t.label} href={t.url} target="_blank" rel="noreferrer" className="btn btn-ghost px-3 py-1.5 text-xs">
-            {t.label} ↗
-          </a>
-        ))}
-      </div>
-      {quote && tweetId && (
-        <p className="mt-2 text-xs text-zinc-500">
-          After quoting, entrants must paste their quote link. It must come from their connected X account.
-        </p>
-      )}
-    </div>
-  );
-}
 
 export function CreateRafflePage() {
   const { guildId } = useParams();
@@ -67,11 +27,7 @@ export function CreateRafflePage() {
     minAccountAgeDays: 0,
     walletType: "NONE" as "NONE" | "EVM" | "SOL",
     winnerRoleId: "",
-    xFollow: "",
-    xTweetUrl: "",
-    xLike: false,
-    xRetweet: false,
-    xQuote: false,
+    x: emptyXTasks as XTasksValue,
   });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
 
@@ -89,8 +45,14 @@ export function CreateRafflePage() {
     setError(null);
     setSaving(true);
     try {
+      const { x, ...rest } = form;
       const raffle = await api<Raffle>(`/guilds/${guildId}/raffles`, {
-        body: { ...form, endsAt: new Date(form.endsAt).toISOString(), xFollowUsernames: parseUsernames(form.xFollow) },
+        body: {
+          ...rest,
+          endsAt: new Date(form.endsAt).toISOString(),
+          xFollowUsernames: x.follows.map(cleanUsername).filter(Boolean),
+          xPosts: x.posts,
+        },
       });
       navigate(`/r/${raffle.id}`);
     } catch (err) {
@@ -100,8 +62,6 @@ export function CreateRafflePage() {
   };
 
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
-
-  const needsTweet = form.xLike || form.xRetweet || form.xQuote;
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -197,43 +157,7 @@ export function CreateRafflePage() {
               X tasks are not enabled yet. The admin needs to set X_API_KEY and X_API_SECRET in Vercel.
             </p>
           ) : (
-            <>
-              <Field label="Accounts to follow" hint="Separate with commas or spaces, max 5. Example: @community, @partner">
-                <input className="input" value={form.xFollow} onChange={(e) => set("xFollow", e.target.value)} placeholder="@username" />
-              </Field>
-              <div>
-                <label className="label">Post tasks</label>
-                <div className="flex flex-wrap gap-6 text-sm">
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={form.xLike} onChange={(e) => set("xLike", e.target.checked)} /> Like
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={form.xRetweet} onChange={(e) => set("xRetweet", e.target.checked)} /> Retweet
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="checkbox" checked={form.xQuote} onChange={(e) => set("xQuote", e.target.checked)} /> Quote
-                  </label>
-                </div>
-              </div>
-              {needsTweet && (
-                <Field label="Post link" hint="The post to like / retweet / quote. Example: https://x.com/name/status/1234567890">
-                  <input
-                    className="input"
-                    value={form.xTweetUrl}
-                    onChange={(e) => set("xTweetUrl", e.target.value)}
-                    placeholder="https://x.com/..."
-                    required
-                  />
-                </Field>
-              )}
-              <TaskPreview
-                follows={parseUsernames(form.xFollow)}
-                tweetId={needsTweet ? parseTweetId(form.xTweetUrl) : null}
-                like={form.xLike}
-                retweet={form.xRetweet}
-                quote={form.xQuote}
-              />
-            </>
+            <XTasksEditor value={form.x} onChange={(v) => set("x", v)} />
           )}
         </section>
 

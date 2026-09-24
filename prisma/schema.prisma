@@ -57,10 +57,12 @@ model Raffle {
 
   // Task X (tidak diverifikasi — peserta cukup klik tombol task lalu konfirmasi)
   xFollowUsernames String[]
+  // Daftar post: [{ tweetId, like, retweet, quote }]. Quote = peserta wajib kirim link quote-nya.
+  xPosts           Json     @default("[]")
+  // Kolom lama (1 post per raffle) — hanya dibaca untuk raffle lama, lihat getXPosts()
   xTweetId         String?
   xLike            Boolean  @default(false)
   xRetweet         Boolean  @default(false)
-  // Peserta wajib quote post lalu mengirim link quote-nya
   xQuote           Boolean  @default(false)
 
   winnerRoleId String?
@@ -90,7 +92,9 @@ model Entry {
   username  String
   wallet    String?
   xUsername String?
-  xQuoteUrl String?
+  // Link quote, urutannya sama dengan post ber-task quote di Raffle.xPosts
+  xQuoteUrls String[]
+  xQuoteUrl  String? // kolom lama (1 quote)
   status    EntryStatus @default(ENTERED)
   note      String?
   createdAt DateTime    @default(now())

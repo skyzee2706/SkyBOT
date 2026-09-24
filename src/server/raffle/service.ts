@@ -4,7 +4,8 @@ import type { Raffle } from "@prisma/client";
 import { db, isUniqueViolation, uniqueTarget } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
 import { connectXUrl, parseQuoteUrl } from "../x.js";
-import { connectXComponents, hasXTasks, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
+import { connectXComponents, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
+import { hasXTasks, quotePosts } from "./xtasks.js";
 import { checkRequirements, normalizeWallet } from "./requirements.js";
 import { scheduleDraw } from "./schedule.js";
 
@@ -62,7 +63,7 @@ export async function publishRaffle(raffle: Raffle) {
 
 export type Entrant = { userId: string; username: string; roleIds: string[] };
 export type Reply = string | { content: string; components?: unknown[] };
-export type Submission = { wallet?: string; quoteUrl?: string };
+export type Submission = { wallet?: string; quoteUrls?: (string | undefined)[] };
 
 const ENDED = "❌ This raffle has already ended.";
 const ALREADY_ENTERED = "✅ You're already entered in this raffle.";
@@ -106,13 +107,32 @@ export async function startXTasks(raffleId: string, who: Entrant): Promise<Reply
   ]);
   if (existing) return ALREADY_ENTERED;
   if (!xLink) return notLinkedReply(who.userId);
+  const quotes = quotePosts(raffle).length;
   return {
     content:
       `X account: **@${xLink.xUsername}**\n` +
       "1️⃣ Click every task button below and complete it on X\n" +
-      (raffle.xQuote ? "2️⃣ Copy the link of your quote post\n3️⃣ Click **Done, enter me** and paste the link" : "2️⃣ Click **Done, enter me**"),
+      (quotes
+        ? `2️⃣ Copy the link of your quote post${quotes > 1 ? "s" : ""}\n3️⃣ Click **Done, enter me** and paste the link${quotes > 1 ? "s" : ""}`
+        : "2️⃣ Click **Done, enter me**"),
     components: xTaskComponents(raffle),
   };
+}
+
+// Validasi link quote untuk tiap post ber-task quote. Mengembalikan pesan error atau daftar link yang sudah dinormalisasi.
+function validateQuotes(raffle: Raffle, xUsername: string, submitted: (string | undefined)[]): string | string[] {
+  const posts = quotePosts(raffle);
+  const urls: string[] = [];
+  for (const [i, post] of posts.entries()) {
+    const url = parseQuoteUrl(submitted[i] ?? "", xUsername, post.tweetId);
+    const which = posts.length > 1 ? ` for post #${i + 1}` : "";
+    if (!url) {
+      return `❌ Invalid quote link${which}. It must be a link to your own post from **@${xUsername}**, e.g. \`https://x.com/${xUsername}/status/123...\``;
+    }
+    if (urls.includes(url)) return `❌ Each quote needs its own post — you used the same link twice.`;
+    urls.push(url);
+  }
+  return urls;
 }
 
 export async function enterRaffle(raffleId: string, who: Entrant, input: Submission = {}): Promise<Reply> {
@@ -120,17 +140,14 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
   if (typeof raffle === "string") return raffle;
 
   let xUsername: string | null = null;
-  let xQuoteUrl: string | null = null;
+  let xQuoteUrls: string[] = [];
   if (hasXTasks(raffle)) {
     const xLink = await db.xLink.findUnique({ where: { discordId: who.userId } });
     if (!xLink) return notLinkedReply(who.userId);
     xUsername = xLink.xUsername;
-    if (raffle.xQuote && raffle.xTweetId) {
-      xQuoteUrl = parseQuoteUrl(input.quoteUrl ?? "", xLink.xUsername, raffle.xTweetId);
-      if (!xQuoteUrl) {
-        return `❌ Invalid quote link. It must be a link to your own post from **@${xLink.xUsername}**, e.g. \`https://x.com/${xLink.xUsername}/status/123...\``;
-      }
-    }
+    const quotes = validateQuotes(raffle, xLink.xUsername, input.quoteUrls ?? []);
+    if (typeof quotes === "string") return quotes;
+    xQuoteUrls = quotes;
   }
 
   let wallet: string | null = null;
@@ -141,7 +158,7 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
 
   try {
     await db.entry.create({
-      data: { raffleId, userId: who.userId, username: who.username, wallet, xUsername, xQuoteUrl },
+      data: { raffleId, userId: who.userId, username: who.username, wallet, xUsername, xQuoteUrls },
     });
   } catch (e) {
     if (isUniqueViolation(e)) {

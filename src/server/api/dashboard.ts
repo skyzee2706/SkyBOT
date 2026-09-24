@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import { fetchBotGuildIds, fetchMember, fetchTextChannels, getGuildContext } from "../discord.js";
 import { botInviteUrl, xEnabled } from "../env.js";
 import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle, rerollRaffle } from "../raffle/service.js";
+import { getXPosts, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 
 export class HttpError extends Error {
@@ -127,7 +128,7 @@ dashboardRouter.get("/guilds/:guildId", async (req, res) => {
         // Bot hanya bisa memberi role yang posisinya di bawah role bot
         assignable: !r.managed && r.position < ctx.botTopPosition,
       })),
-    raffles: raffles.map(({ _count, ...r }) => ({ ...r, entryCount: _count.entries })),
+    raffles: raffles.map(({ _count, ...r }) => ({ ...r, xPosts: getXPosts(r), entryCount: _count.entries })),
   });
 });
 
@@ -169,14 +170,23 @@ const createSchema = z.object({
         .transform((s) => s.trim().replace(/^https?:\/\/(www\.)?(x|twitter)\.com\//i, "").replace(/^@/, "").split(/[/?]/)[0])
         .refine((s) => /^[A-Za-z0-9_]{1,15}$/.test(s), "Invalid X username"),
     )
-    .max(5, "Maximum 5 accounts to follow")
+    .max(MAX_FOLLOWS, `Maximum ${MAX_FOLLOWS} accounts to follow`)
     .default([]),
-  // Link post X, mis. https://x.com/nama/status/1234567890
-  xTweetUrl: z.string().trim().default(""),
-  xLike: z.boolean().default(false),
-  xRetweet: z.boolean().default(false),
-  xQuote: z.boolean().default(false),
+  // Tiap post: link (mis. https://x.com/nama/status/1234567890) + task yang dipilih
+  xPosts: z
+    .array(
+      z.object({
+        url: z.string().trim(),
+        like: z.boolean().default(false),
+        retweet: z.boolean().default(false),
+        quote: z.boolean().default(false),
+      }),
+    )
+    .max(MAX_POSTS, `Maximum ${MAX_POSTS} posts`)
+    .default([]),
 });
+
+const tweetIdFrom = (s: string) => s.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(s) ? s : null);
 
 dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const guildId = param(req, "guildId");
@@ -184,14 +194,23 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   await requireManager(guildId, user.id);
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
-  const { imageUrl, winnerRoleId, xTweetUrl, ...data } = parsed.data;
+  const { imageUrl, winnerRoleId, xPosts: postInputs, ...data } = parsed.data;
 
-  let xTweetId: string | null = null;
-  if (data.xLike || data.xRetweet || data.xQuote) {
-    xTweetId = xTweetUrl.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(xTweetUrl) ? xTweetUrl : null);
-    if (!xTweetId) throw new HttpError(400, "Invalid X post link (e.g. https://x.com/name/status/123...)");
+  const xPosts: XPost[] = [];
+  for (const [i, p] of postInputs.entries()) {
+    if (!p.url && !p.like && !p.retweet && !p.quote) continue; // baris kosong
+    const tweetId = tweetIdFrom(p.url);
+    if (!tweetId) throw new HttpError(400, `Post #${i + 1}: invalid X post link (e.g. https://x.com/name/status/123...)`);
+    if (!p.like && !p.retweet && !p.quote) throw new HttpError(400, `Post #${i + 1}: choose at least one task (Like, Retweet or Quote)`);
+    if (xPosts.some((x) => x.tweetId === tweetId)) throw new HttpError(400, `Post #${i + 1} is a duplicate`);
+    xPosts.push({ tweetId, like: p.like, retweet: p.retweet, quote: p.quote });
   }
-  if ((data.xFollowUsernames.length || xTweetId) && !xEnabled) {
+  // Form Discord maksimal 5 isian: link quote + wallet
+  const formFields = xPosts.filter((p) => p.quote).length + (data.walletType !== "NONE" ? 1 : 0);
+  if (formFields > 5) {
+    throw new HttpError(400, "Too many Quote tasks: Quote posts + wallet can't be more than 5 in total.");
+  }
+  if ((data.xFollowUsernames.length || xPosts.length) && !xEnabled) {
     throw new HttpError(400, "X tasks are not enabled yet. The admin needs to set X_API_KEY and X_API_SECRET.");
   }
 
@@ -199,7 +218,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
     data: {
       ...data,
       xFollowUsernames: [...new Set(data.xFollowUsernames)],
-      xTweetId,
+      xPosts,
       guildId,
       imageUrl: imageUrl || null,
       winnerRoleId: winnerRoleId || null,
@@ -222,7 +241,14 @@ dashboardRouter.get("/raffles/:id", async (req, res) => {
     db.raffle.findUniqueOrThrow({ where: { id: raffle.id } }),
     db.entry.findMany({ where: { raffleId: raffle.id }, orderBy: { createdAt: "asc" } }),
   ]);
-  res.json({ raffle: fresh, entries });
+  res.json({
+    raffle: { ...fresh, xPosts: getXPosts(fresh) },
+    // Entry lama menyimpan 1 link quote di kolom tunggal
+    entries: entries.map(({ xQuoteUrl, ...e }) => ({
+      ...e,
+      xQuoteUrls: e.xQuoteUrls.length ? e.xQuoteUrls : xQuoteUrl ? [xQuoteUrl] : [],
+    })),
+  });
 });
 
 dashboardRouter.post("/raffles/:id/end", async (req, res) => {
@@ -266,12 +292,12 @@ dashboardRouter.get("/raffles/:id/export.csv", async (req, res) => {
     orderBy: { createdAt: "asc" },
   });
   const rows = [
-    ["discord_id", "username", "x_username", "x_quote_url", "wallet", "status", "note", "entered_at"],
+    ["discord_id", "username", "x_username", "x_quote_urls", "wallet", "status", "note", "entered_at"],
     ...entries.map((e) => [
       e.userId,
       e.username,
       e.xUsername,
-      e.xQuoteUrl,
+      (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(" "),
       e.wallet,
       e.status,
       e.note,
