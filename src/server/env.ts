@@ -1,13 +1,16 @@
 import "dotenv/config";
 import { z } from "zod";
 
-const required = (name: string) => z.string().min(1, `${name} belum diisi`);
+const required = (name: string) => z.string().trim().min(1, `${name} belum diisi`);
+// Nilai yang berisi spasi biasanya tanda beberapa baris .env ter-paste jadi satu
+const noSpaces = (name: string) =>
+  required(name).refine((v) => !/\s/.test(v), `${name} berisi spasi — kemungkinan beberapa baris ter-paste jadi satu`);
 
 const schema = z.object({
-  DISCORD_CLIENT_ID: required("DISCORD_CLIENT_ID"),
-  DISCORD_CLIENT_SECRET: required("DISCORD_CLIENT_SECRET"),
-  DISCORD_BOT_TOKEN: required("DISCORD_BOT_TOKEN"),
-  DISCORD_PUBLIC_KEY: required("DISCORD_PUBLIC_KEY"),
+  DISCORD_CLIENT_ID: required("DISCORD_CLIENT_ID").regex(/^\d{17,20}$/, "DISCORD_CLIENT_ID harus berupa angka saja (Application ID)"),
+  DISCORD_CLIENT_SECRET: noSpaces("DISCORD_CLIENT_SECRET"),
+  DISCORD_BOT_TOKEN: noSpaces("DISCORD_BOT_TOKEN"),
+  DISCORD_PUBLIC_KEY: required("DISCORD_PUBLIC_KEY").regex(/^[0-9a-f]{64}$/i, "DISCORD_PUBLIC_KEY harus 64 karakter hex (Public Key)"),
   DATABASE_URL: required("DATABASE_URL"),
   PUBLIC_URL: z.string().url().default("http://localhost:5173"),
   // Upstash QStash: menjadwalkan undian tepat waktu. Opsional saat development lokal.
