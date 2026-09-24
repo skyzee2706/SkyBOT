@@ -1,0 +1,120 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id // Discord user ID
+  username  String
+  avatar    String?
+  createdAt DateTime  @default(now())
+  sessions  Session[]
+}
+
+model Session {
+  id          String   @id
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken String
+  expiresAt   DateTime
+
+  @@index([userId])
+}
+
+enum RaffleStatus {
+  ACTIVE
+  ENDED
+  CANCELLED
+}
+
+enum WalletType {
+  NONE
+  EVM
+  SOL
+}
+
+model Raffle {
+  id          String       @id @default(cuid())
+  guildId     String
+  channelId   String
+  messageId   String?
+  title       String
+  description String       @default("")
+  imageUrl    String?
+  winnerCount Int
+  endsAt      DateTime
+  status      RaffleStatus @default(ACTIVE)
+
+  // Requirements
+  requiredRoleIds    String[]
+  blockedRoleIds     String[]
+  minAccountAgeDays  Int        @default(0)
+  walletType         WalletType @default(NONE)
+
+  // Task X (tidak diverifikasi — peserta cukup klik tombol task lalu konfirmasi)
+  xFollowUsernames String[]
+  xTweetId         String?
+  xLike            Boolean  @default(false)
+  xRetweet         Boolean  @default(false)
+
+  winnerRoleId String?
+  createdById  String
+  createdAt    DateTime @default(now())
+  endedAt      DateTime?
+  // Kapan jumlah peserta di embed Discord terakhir di-update (dibatasi supaya tidak kena rate limit)
+  messageSyncedAt DateTime?
+
+  entries Entry[]
+
+  @@index([guildId])
+  @@index([status])
+}
+
+enum EntryStatus {
+  ENTERED
+  WON
+  DISQUALIFIED
+}
+
+model Entry {
+  id        String      @id @default(cuid())
+  raffleId  String
+  raffle    Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  userId    String
+  username  String
+  wallet    String?
+  xUsername String?
+  status    EntryStatus @default(ENTERED)
+  note      String?
+  createdAt DateTime    @default(now())
+
+  @@unique([raffleId, userId])
+  @@unique([raffleId, wallet])
+  @@index([raffleId, status])
+}
+
+// Akun X yang terhubung ke akun Discord (1 akun X hanya untuk 1 akun Discord)
+model XLink {
+  discordId  String   @id
+  xUserId    String   @unique
+  xUsername  String
+  linkedAt   DateTime @default(now())
+}
+
+// Penyimpanan sementara selama proses login X (OAuth 1.0a)
+model XAuthState {
+  oauthToken  String   @id
+  tokenSecret String
+  discordId   String
+  createdAt   DateTime @default(now())
+}
+
+model GuildSettings {
+  guildId        String   @id
+  // Role yang boleh mengelola raffle di web (mis. @CM), selain Admin / Manage Server
+  managerRoleIds String[]
+}
