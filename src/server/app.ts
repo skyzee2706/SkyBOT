@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import { authRouter } from "./api/auth.js";
 import { cronRouter } from "./api/cron.js";
 import { dashboardRouter, HttpError } from "./api/dashboard.js";
+import { serveImage } from "./api/images.js";
 import { interactionsRouter } from "./api/interactions.js";
 import { xRouter } from "./api/xauth.js";
 
@@ -18,11 +19,16 @@ app.use(express.json({ limit: "100kb" }));
 app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/x", xRouter);
+app.get("/api/images/:id", serveImage); // publik, tanpa login (Discord perlu mengambil gambarnya)
 app.use("/api", dashboardRouter);
 
 const onError: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
     res.status(err.status).json({ error: err.message });
+    return;
+  }
+  if (err?.status === 413) {
+    res.status(413).json({ error: "File is too large (max 4 MB)." });
     return;
   }
   if (err?.status === 401) {

@@ -6,6 +6,7 @@ import { botInviteUrl, xEnabled } from "../env.js";
 import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle, rerollRaffle } from "../raffle/service.js";
 import { getXPosts, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
+import { rawImageBody, saveImage } from "./images.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -130,6 +131,15 @@ dashboardRouter.get("/guilds/:guildId", async (req, res) => {
       })),
     raffles: raffles.map(({ _count, ...r }) => ({ ...r, xPosts: getXPosts(r), entryCount: _count.entries })),
   });
+});
+
+dashboardRouter.post("/guilds/:guildId/images", rawImageBody, async (req, res) => {
+  const guildId = param(req, "guildId");
+  const user = userOf(res);
+  await requireManager(guildId, user.id);
+  const result = await saveImage(req, guildId, user.id);
+  if ("error" in result) throw new HttpError(400, result.error!);
+  res.json(result);
 });
 
 dashboardRouter.put("/guilds/:guildId/settings", async (req, res) => {

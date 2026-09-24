@@ -16,6 +16,18 @@ export async function api<T>(path: string, init?: { method?: string; body?: unkn
   return data as T;
 }
 
+export async function uploadImage(guildId: string, file: Blob): Promise<string> {
+  const res = await fetch(`/api/guilds/${guildId}/images`, {
+    method: "POST",
+    headers: { "Content-Type": file.type || "application/octet-stream" },
+    body: file,
+    credentials: "same-origin",
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new ApiError(res.status, data.error ?? `Upload failed (${res.status})`);
+  return data.url as string;
+}
+
 export type Me = { id: string; username: string; avatar: string | null };
 export type GuildSummary = { id: string; name: string; icon: string | null; botPresent: boolean; inviteUrl: string };
 export type Role = { id: string; name: string; color: number; assignable: boolean };

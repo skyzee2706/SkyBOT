@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, type GuildDetail, type Raffle } from "../api";
 import { ErrorBox, Field, Loading, RolePicker } from "../components";
 import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
+import { ImageInput } from "./ImageInput";
 
 // Nilai default untuk <input type="datetime-local"> (waktu lokal browser)
 const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -85,8 +86,8 @@ export function CreateRafflePage() {
               maxLength={3000}
             />
           </Field>
-          <Field label="Image URL (optional)" hint="Direct link to an image, e.g. from Discord or Imgur.">
-            <input className="input" value={form.imageUrl} onChange={(e) => set("imageUrl", e.target.value)} placeholder="https://..." />
+          <Field label="Image (optional)">
+            <ImageInput guildId={guildId!} value={form.imageUrl} onChange={(url) => set("imageUrl", url)} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Channel">

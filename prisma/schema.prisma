@@ -120,6 +120,19 @@ model XAuthState {
   createdAt   DateTime @default(now())
 }
 
+// Gambar raffle yang di-upload dari web (sudah dikompres di browser), disajikan lewat /api/images/:id
+model Image {
+  id         String   @id @default(cuid())
+  guildId    String
+  uploaderId String
+  mime       String
+  size       Int
+  data       Bytes
+  createdAt  DateTime @default(now())
+
+  @@index([uploaderId, createdAt])
+}
+
 model GuildSettings {
   guildId        String   @id
   // Role yang boleh mengelola raffle di web (mis. @CM), selain Admin / Manage Server
