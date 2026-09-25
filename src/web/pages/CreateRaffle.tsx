@@ -4,6 +4,7 @@ import { api, type GuildDetail, type Raffle } from "../api";
 import { ErrorBox, Field, Loading, RolePicker } from "../components";
 import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
 import { ImageInput } from "./ImageInput";
+import { ALLOCATIONS, CHAIN_IDS, CHAINS, type ChainId } from "../../shared/raffle";
 
 // Nilai default untuk <input type="datetime-local"> (waktu lokal browser)
 const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -21,7 +22,10 @@ export function CreateRafflePage() {
     description: "",
     imageUrl: "",
     channelId: "",
-    winnerCount: 1,
+    // Allocations: centang GTD dan/atau FCFS, masing-masing dengan jumlah slot
+    gtd: { on: true, count: 1 },
+    fcfs: { on: false, count: 1 },
+    chain: "" as "" | ChainId,
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
     minAccountAgeDays: 0,
@@ -30,19 +34,35 @@ export function CreateRafflePage() {
     mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+  type ErrorKey = keyof typeof form | "allocations";
+  const [errors, setErrors] = useState<Partial<Record<ErrorKey, string>>>({});
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
     setForm((f) => ({ ...f, [k]: v }));
-    setErrors((e) => (e[k] ? { ...e, [k]: undefined } : e));
+    const key: ErrorKey = k === "gtd" || k === "fcfs" ? "allocations" : k;
+    setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
+  // Jenis wallet mengikuti chain: Solana = wallet Solana, chain lain = EVM
+  const chainWallet = form.chain ? CHAINS[form.chain].wallet : null;
+  const setChain = (chain: "" | ChainId) => {
+    set("chain", chain);
+    if (chain && form.walletType !== "NONE") set("walletType", CHAINS[chain].wallet);
+  };
+
+  const allocationTotal = () => (form.gtd.on ? form.gtd.count : 0) + (form.fcfs.on ? form.fcfs.count : 0);
 
   // Field wajib: kosong = tidak bisa dikirim ke Discord, field-nya ditandai merah.
   const validate = () => {
     const e: typeof errors = {};
     if (!form.title.trim()) e.title = "Title is required";
     if (!form.channelId) e.channelId = "Please choose a channel";
-    if (!Number.isInteger(form.winnerCount) || form.winnerCount < 1) e.winnerCount = "At least 1 winner";
-    else if (form.winnerCount > 1000) e.winnerCount = "Maximum 1000 winners";
+    const picked = ALLOCATIONS.filter((a) => form[a === "GTD" ? "gtd" : "fcfs"].on);
+    const bad = picked.find((a) => {
+      const n = form[a === "GTD" ? "gtd" : "fcfs"].count;
+      return !Number.isInteger(n) || n < 1;
+    });
+    if (!picked.length) e.allocations = "Choose GTD, FCFS, or both";
+    else if (bad) e.allocations = `${bad} needs at least 1 spot`;
+    else if (allocationTotal() > 1000) e.allocations = "Maximum 1000 allocations in total";
     const end = new Date(form.endsAt).getTime();
     if (!form.endsAt || Number.isNaN(end)) e.endsAt = "End time is required";
     else if (end <= Date.now() + 60_000) e.endsAt = "End time must be at least 1 minute from now";
@@ -70,10 +90,12 @@ export function CreateRafflePage() {
     }
     setSaving(true);
     try {
-      const { x, ...rest } = form;
+      const { x, gtd, fcfs, ...rest } = form;
       const raffle = await api<Raffle>(`/guilds/${guildId}/raffles`, {
         body: {
           ...rest,
+          gtdCount: gtd.on ? gtd.count : 0,
+          fcfsCount: fcfs.on ? fcfs.count : 0,
           endsAt: new Date(form.endsAt).toISOString(),
           xFollowUsernames: x.follows.map(cleanUsername).filter(Boolean),
           xPosts: x.posts,
@@ -126,18 +148,50 @@ export function CreateRafflePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Number of Winners" required error={errors.winnerCount}>
-              <input
-                type="number"
-                min={1}
-                max={1000}
-                className="input"
-                value={form.winnerCount}
-                onChange={(e) => set("winnerCount", Number(e.target.value))}
-                required
-              />
+            <Field label="Chain (optional)">
+              <select className="input" value={form.chain} onChange={(e) => setChain(e.target.value as "" | ChainId)}>
+                <option value="">— None —</option>
+                {CHAIN_IDS.map((c) => (
+                  <option key={c} value={c}>
+                    {CHAINS[c].label}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
+          <Field
+            label="Allocations"
+            required
+            error={errors.allocations}
+            hint="Pick GTD, FCFS, or both. With both, GTD winners are drawn first, then FCFS from the remaining entrants."
+          >
+            <div className="grid gap-2 sm:grid-cols-2">
+              {ALLOCATIONS.map((a) => {
+                const key = a === "GTD" ? "gtd" : "fcfs";
+                const v = form[key];
+                return (
+                  <label
+                    key={a}
+                    className={`input flex cursor-pointer items-center gap-3 ${v.on ? "border-indigo-500/70" : ""}`}
+                  >
+                    <input type="checkbox" checked={v.on} onChange={(e) => set(key, { ...v, on: e.target.checked })} />
+                    <span className="w-12 font-medium">{a}</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={1000}
+                      aria-label={`${a} spots`}
+                      className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 disabled:opacity-40"
+                      value={v.count}
+                      disabled={!v.on}
+                      onChange={(e) => set(key, { ...v, count: Number(e.target.value) })}
+                    />
+                    <span className="text-xs text-zinc-500">spots</span>
+                  </label>
+                );
+              })}
+            </div>
+          </Field>
           <Field label="End Time" hint="Uses your computer's time zone." required error={errors.endsAt}>
             <input type="datetime-local" className="input" value={form.endsAt} onChange={(e) => set("endsAt", e.target.value)} required />
           </Field>
@@ -171,8 +225,8 @@ export function CreateRafflePage() {
             <Field label="Wallet submission">
               <select className="input" value={form.walletType} onChange={(e) => set("walletType", e.target.value as typeof form.walletType)}>
                 <option value="NONE">Not required</option>
-                <option value="EVM">EVM (Ethereum, Base, etc)</option>
-                <option value="SOL">Solana</option>
+                {chainWallet !== "SOL" && <option value="EVM">EVM wallet (0x...)</option>}
+                {chainWallet !== "EVM" && <option value="SOL">Solana wallet</option>}
               </select>
             </Field>
           </div>

@@ -2,8 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Entry, type Raffle } from "../api";
 import { ErrorBox, formatDate, Loading, StatusBadge } from "../components";
+import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
 
-type Filter = "ALL" | Entry["status"];
+// GTD / FCFS = pemenang per allocation (raffle baru); WON = semua pemenang (raffle lama)
+type Filter = "ALL" | Entry["status"] | AllocationType;
 
 const ENTRY_STATUS: Record<Entry["status"], { label: string; cls: string }> = {
   ENTERED: { label: "Entered", cls: "text-zinc-400" },
@@ -45,16 +47,20 @@ export function RafflePage() {
   const hasX = raffle.xFollowUsernames.length > 0 || posts.length > 0;
   const quoteCount = posts.filter((p) => p.quote).length;
 
-  const counts = {
-    ALL: entries.length,
-    ENTERED: entries.filter((e) => e.status === "ENTERED").length,
-    WON: entries.filter((e) => e.status === "WON").length,
-    DISQUALIFIED: entries.filter((e) => e.status === "DISQUALIFIED").length,
-  };
+  const withAllocations = hasAllocations(raffle);
+  const usedAllocations = ALLOCATIONS.filter((a) => allocationCount(raffle, a) > 0);
+  const isWinnerOf = (e: Entry, a: AllocationType) => e.status === "WON" && e.allocation === a;
+  const matches = (e: Entry, f: Filter) =>
+    f === "ALL" || (f === "GTD" || f === "FCFS" ? isWinnerOf(e, f) : e.status === f);
+  const filters: Filter[] = ["ALL", ...(withAllocations ? usedAllocations : (["WON"] as Filter[])), "ENTERED", "DISQUALIFIED"];
+  const filterLabel = (f: Filter) =>
+    f === "ALL" ? "All" : f === "GTD" || f === "FCFS" ? `🏆 ${f} Winners` : ENTRY_STATUS[f].label;
+  const counts = Object.fromEntries(filters.map((f) => [f, entries.filter((e) => matches(e, f)).length])) as Record<Filter, number>;
+  const winnerCount = entries.filter((e) => e.status === "WON").length;
   const q = search.trim().toLowerCase();
   const shown = entries.filter(
     (e) =>
-      (filter === "ALL" || e.status === filter) &&
+      matches(e, filter) &&
       (!q ||
         e.username.toLowerCase().includes(q) ||
         e.userId.includes(q) ||
@@ -77,11 +83,16 @@ export function RafflePage() {
             <h1 className="truncate text-2xl font-bold">{raffle.title}</h1>
             <StatusBadge status={raffle.status} />
           </div>
+          {raffle.hostName && (
+            <div className="mb-2 flex items-center gap-2 text-sm text-zinc-400">
+              {raffle.hostAvatar && <img src={raffle.hostAvatar} className="h-5 w-5 rounded-full" alt="" />}
+              Hosted by <span className="font-medium text-zinc-200">{raffle.hostName}</span>
+            </div>
+          )}
           {raffle.description && <p className="mb-3 whitespace-pre-wrap text-sm text-zinc-400">{raffle.description}</p>}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
-            <span>
-              {raffle.winnerCount} winner{raffle.winnerCount > 1 ? "s" : ""}
-            </span>
+            <span>{withAllocations ? `Allocations: ${allocationSummary(raffle)}` : allocationSummary(raffle)}</span>
+            {chainLabel(raffle.chain) && <span>Chain: {chainLabel(raffle.chain)}</span>}
             <span>
               {entries.length} entr{entries.length === 1 ? "y" : "ies"}
             </span>
@@ -146,7 +157,7 @@ export function RafflePage() {
               </button>
             </>
           ))}
-        {counts.WON > 0 && (
+        {winnerCount > 0 && (
           <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
             Export Winners (Excel)
           </a>
@@ -156,13 +167,13 @@ export function RafflePage() {
       <div className="card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1">
-            {(["ALL", "WON", "ENTERED", "DISQUALIFIED"] as Filter[]).map((f) => (
+            {filters.map((f) => (
               <button
                 key={f}
                 onClick={() => setFilter(f)}
                 className={`rounded-lg px-3 py-1.5 text-sm ${filter === f ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
               >
-                {f === "ALL" ? "All" : ENTRY_STATUS[f].label} ({counts[f]})
+                {filterLabel(f)} ({counts[f]})
               </button>
             ))}
           </div>
@@ -214,7 +225,7 @@ export function RafflePage() {
                     )}
                     {raffle.walletType !== "NONE" && <td className="py-2 pr-4 font-mono text-xs">{e.wallet}</td>}
                     <td className={`py-2 pr-4 ${ENTRY_STATUS[e.status].cls}`}>
-                      {ENTRY_STATUS[e.status].label}
+                      {e.status === "WON" && e.allocation ? `🏆 Won · ${e.allocation}` : ENTRY_STATUS[e.status].label}
                       {e.note && <div className="text-xs text-zinc-500">{e.note}</div>}
                     </td>
                     <td className="py-2 pr-4 text-xs text-zinc-500">{formatDate(e.createdAt)}</td>

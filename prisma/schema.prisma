@@ -31,6 +31,11 @@ enum RaffleStatus {
   CANCELLED
 }
 
+enum Allocation {
+  GTD
+  FCFS
+}
+
 enum WalletType {
   NONE
   EVM
@@ -45,7 +50,14 @@ model Raffle {
   title       String
   description String       @default("")
   imageUrl    String?
-  winnerCount Int
+  winnerCount Int // total pemenang (= gtdCount + fcfsCount untuk raffle baru)
+  // Allocations. Keduanya 0 = raffle lama (sebelum ada allocation), ditampilkan sebagai "Winners".
+  gtdCount    Int          @default(0)
+  fcfsCount   Int          @default(0)
+  chain       String? // lihat CHAINS di src/server/raffle/chains.ts
+  // "Hosted by" di embed: nama & foto profil Discord pembuat raffle (disimpan saat dibuat)
+  hostName    String?
+  hostAvatar  String?
   endsAt      DateTime
   status      RaffleStatus @default(ACTIVE)
 
@@ -101,6 +113,7 @@ model Entry {
   xQuoteUrls String[]
   xQuoteUrl  String? // kolom lama (1 quote)
   status    EntryStatus @default(ENTERED)
+  allocation Allocation? // diisi saat menang (GTD / FCFS); null untuk raffle lama
   note      String?
   createdAt DateTime    @default(now())
 

@@ -1,6 +1,7 @@
 import { randomInt } from "node:crypto";
 import { Routes, type APIMessage } from "discord.js";
-import type { Raffle } from "@prisma/client";
+import type { Allocation, Raffle } from "@prisma/client";
+import { hasAllocations } from "../../shared/raffle.js";
 import { db, isUniqueViolation, uniqueTarget } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
 import { connectXUrl, parseQuoteUrl, type TaskClick } from "../x.js";
@@ -11,19 +12,20 @@ import { scheduleDraw } from "./schedule.js";
 
 const MESSAGE_SYNC_INTERVAL_MS = 15_000;
 
-async function winnerIdsOf(raffleId: string) {
-  const winners = await db.entry.findMany({
+export type Winner = { userId: string; allocation: Allocation | null };
+
+async function winnersOf(raffleId: string): Promise<Winner[]> {
+  return db.entry.findMany({
     where: { raffleId, status: "WON" },
-    select: { userId: true },
+    select: { userId: true, allocation: true },
     orderBy: { createdAt: "asc" },
   });
-  return winners.map((w) => w.userId);
 }
 
 async function messagePayload(raffle: Raffle) {
   const [count, winners] = await Promise.all([
     db.entry.count({ where: { raffleId: raffle.id } }),
-    raffle.status === "ENDED" ? winnerIdsOf(raffle.id) : Promise.resolve([]),
+    raffle.status === "ENDED" ? winnersOf(raffle.id) : Promise.resolve([]),
   ]);
   return { embeds: [raffleEmbed(raffle, count, winners).toJSON()], components: [raffleButtons(raffle).toJSON()] };
 }
@@ -251,7 +253,8 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
 export async function entryStatus(raffleId: string, userId: string) {
   const entry = await db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId } } });
   if (!entry) return "You haven't entered this raffle yet.";
-  const label = { ENTERED: "🎟️ Entered", WON: "🏆 YOU WON!", DISQUALIFIED: "⛔ Disqualified" }[entry.status];
+  const won = entry.allocation ? `🏆 YOU WON! (${entry.allocation})` : "🏆 YOU WON!";
+  const label = { ENTERED: "🎟️ Entered", WON: won, DISQUALIFIED: "⛔ Disqualified" }[entry.status];
   return (
     label +
     (entry.xUsername ? `\nX: @${entry.xUsername}` : "") +
@@ -270,7 +273,9 @@ function shuffle<T>(arr: T[]) {
 
 // Mengundi pemenang dari peserta yang belum menang. Tiap kandidat dicek ULANG syaratnya langsung ke Discord
 // (masih di server, role masih ada) sebelum dinyatakan menang; yang gagal didiskualifikasi dan diganti.
-async function pickWinners(raffle: Raffle, count: number): Promise<string[]> {
+// `allocation` (GTD / FCFS) disimpan di entry pemenang; null untuk raffle lama.
+async function pickWinners(raffle: Raffle, count: number, allocation: Allocation | null): Promise<string[]> {
+  if (count <= 0) return [];
   const candidates = shuffle(
     await db.entry.findMany({ where: { raffleId: raffle.id, status: "ENTERED" }, select: { id: true, userId: true } }),
   );
@@ -284,7 +289,7 @@ async function pickWinners(raffle: Raffle, count: number): Promise<string[]> {
       await db.entry.update({ where: { id: c.id }, data: { status: "DISQUALIFIED", note: errors.join("; ") } });
       continue;
     }
-    await db.entry.update({ where: { id: c.id }, data: { status: "WON" } });
+    await db.entry.update({ where: { id: c.id }, data: { status: "WON", allocation } });
     winners.push(c.userId);
     if (raffle.winnerRoleId) {
       await rest
@@ -297,15 +302,26 @@ async function pickWinners(raffle: Raffle, count: number): Promise<string[]> {
   return winners;
 }
 
-async function announce(raffle: Raffle, text: string, winners: string[]) {
+type WinnerGroup = { title: string | null; userIds: string[] };
+
+// Pengumuman pemenang. Tiap grup (mis. GTD / FCFS) punya judul sendiri; dipecah jadi beberapa pesan kalau terlalu panjang.
+async function announce(raffle: Raffle, text: string, groups: WinnerGroup[]) {
+  const pieces: string[] = [];
+  for (const g of groups.filter((g) => g.userIds.length)) {
+    if (g.title) pieces.push(`\n${g.title}\n`);
+    pieces.push(...g.userIds.map((id) => `<@${id}>`));
+  }
   const chunks: string[] = [];
   let cur = text;
-  for (const m of winners.map((id) => `<@${id}>`)) {
-    if (cur.length + m.length + 1 > 1900) {
+  for (const p of pieces) {
+    if (cur.length + p.length + 1 > 1900) {
       chunks.push(cur);
-      cur = "";
+      cur = p.replace(/^\n/, "");
+      continue;
     }
-    cur += (cur && !cur.endsWith("\n") ? " " : "") + m;
+    // Judul grup selalu diawali satu baris kosong; mention dipisah spasi
+    const joiner = p.startsWith("\n") ? (cur.endsWith("\n") ? "" : "\n") : !cur || cur.endsWith("\n") ? "" : " ";
+    cur += joiner + p;
   }
   chunks.push(cur);
 
@@ -313,7 +329,8 @@ async function announce(raffle: Raffle, text: string, winners: string[]) {
     await rest.post(Routes.channelMessages(raffle.channelId), {
       body: {
         content,
-        allowed_mentions: { users: winners },
+        // Discord maksimal 100 user per pesan; tiap potongan (≤1900 karakter) berisi < 100 mention
+        allowed_mentions: { users: [...content.matchAll(/<@(\d+)>/g)].map((m) => m[1]) },
         message_reference:
           i === 0 && raffle.messageId ? { message_id: raffle.messageId, fail_if_not_exists: false } : undefined,
       },
@@ -330,16 +347,23 @@ export async function endRaffle(raffleId: string) {
   if (!count) return false;
 
   const raffle = await db.raffle.findUniqueOrThrow({ where: { id: raffleId } });
-  const winners = await pickWinners(raffle, raffle.winnerCount);
+  // GTD diundi dulu, lalu FCFS dari peserta sisanya — satu orang tidak bisa menang dua kali.
+  const groups: WinnerGroup[] = hasAllocations(raffle)
+    ? [
+        { title: "**🏆 GTD Winners**", userIds: await pickWinners(raffle, raffle.gtdCount, "GTD") },
+        { title: "**🎟️ FCFS Winners**", userIds: await pickWinners(raffle, raffle.fcfsCount, "FCFS") },
+      ]
+    : [{ title: null, userIds: await pickWinners(raffle, raffle.winnerCount, null) }];
+  const total = groups.reduce((n, g) => n + g.userIds.length, 0);
   await refreshMessage(raffleId);
   await announce(
     raffle,
-    winners.length
+    total
       ? `🎉 **${raffle.title}** has ended! Congratulations to the winners:\n`
       : `**${raffle.title}** has ended, but no entrants met the requirements.`,
-    winners,
+    groups,
   ).catch((e) => console.error("[raffle] failed to announce winners", e));
-  console.log(`[raffle] ${raffleId} ended, ${winners.length} winners`);
+  console.log(`[raffle] ${raffleId} ended, ${total} winners`);
   return true;
 }
 
@@ -363,6 +387,6 @@ export async function cancelRaffle(raffleId: string) {
 }
 
 export async function disqualifyEntry(raffleId: string, entryId: string, note: string) {
-  await db.entry.update({ where: { id: entryId, raffleId }, data: { status: "DISQUALIFIED", note } });
+  await db.entry.update({ where: { id: entryId, raffleId }, data: { status: "DISQUALIFIED", allocation: null, note } });
   await refreshMessage(raffleId);
 }

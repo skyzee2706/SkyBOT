@@ -42,6 +42,11 @@ export type Raffle = {
   description: string;
   imageUrl: string | null;
   winnerCount: number;
+  gtdCount: number;
+  fcfsCount: number;
+  chain: string | null;
+  hostName: string | null;
+  hostAvatar: string | null;
   endsAt: string;
   endedAt: string | null;
   status: RaffleStatus;
@@ -74,6 +79,7 @@ export type Entry = {
   xUsername: string | null;
   xQuoteUrls: string[];
   status: "ENTERED" | "WON" | "DISQUALIFIED";
+  allocation: "GTD" | "FCFS" | null;
   note: string | null;
   createdAt: string;
 };

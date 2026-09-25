@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, guildIcon, type GuildDetail } from "../api";
 import { ErrorBox, formatDate, Loading, RolePicker, StatusBadge } from "../components";
+import { allocationSummary, chainLabel } from "../../shared/raffle";
 
 // Hanya tampil untuk admin: pilih role (mis. @CM) yang boleh mengelola raffle di web.
 function ManagerRolesPanel({ data }: { data: GuildDetail }) {
@@ -99,7 +100,8 @@ export function GuildPage() {
                   <StatusBadge status={r.status} />
                 </div>
                 <div className="text-xs text-zinc-500">
-                  #{channelName(r.channelId)} · {r.winnerCount} winner{r.winnerCount > 1 ? "s" : ""} ·{" "}
+                  #{channelName(r.channelId)} · {allocationSummary(r)}
+                  {chainLabel(r.chain) && ` · ${chainLabel(r.chain)}`} ·{" "}
                   {r.status === "ACTIVE" ? "ends" : "ended"} {formatDate(r.endedAt ?? r.endsAt)}
                 </div>
               </div>

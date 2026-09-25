@@ -8,6 +8,7 @@ import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raf
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
 import { buildXlsx, type Cell } from "../xlsx.js";
+import { CHAIN_IDS, CHAINS } from "../../shared/raffle.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -166,7 +167,10 @@ const createSchema = z.object({
   title: z.string().trim().min(1, "Title is required").max(200),
   description: z.string().max(3000).default(""),
   imageUrl: z.union([z.literal(""), z.string().url("Invalid image URL")]).optional(),
-  winnerCount: z.coerce.number().int().min(1, "At least 1 winner").max(1000),
+  // Allocations: GTD dan/atau FCFS (0 = tidak dipakai), minimal salah satu.
+  gtdCount: z.coerce.number().int("GTD must be a whole number").min(0).max(1000, "Maximum 1000 GTD").default(0),
+  fcfsCount: z.coerce.number().int("FCFS must be a whole number").min(0).max(1000, "Maximum 1000 FCFS").default(0),
+  chain: z.union([z.literal(""), z.enum(CHAIN_IDS)]).optional(),
   endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
   requiredRoleIds: z.array(z.string()).default([]),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
@@ -197,6 +201,11 @@ const createSchema = z.object({
     .default([]),
 });
 
+const discordAvatarUrl = (userId: string, hash: string | null) =>
+  hash
+    ? `https://cdn.discordapp.com/avatars/${userId}/${hash}.png?size=128`
+    : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userId) >> 22n) % 6n)}.png`;
+
 const tweetIdFrom = (s: string) => s.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(s) ? s : null);
 
 dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
@@ -205,7 +214,14 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const ctx = await requireManager(guildId, user.id);
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
-  const { imageUrl, winnerRoleId, xPosts: postInputs, ...data } = parsed.data;
+  const { imageUrl, winnerRoleId, xPosts: postInputs, chain, ...data } = parsed.data;
+  const winnerCount = data.gtdCount + data.fcfsCount;
+  if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
+  if (winnerCount > 1000) throw new HttpError(400, "Maximum 1000 allocations in total");
+  // Jenis wallet harus sesuai chain (Solana = wallet Solana, chain lain = EVM)
+  if (chain && data.walletType !== "NONE" && data.walletType !== CHAINS[chain].wallet) {
+    throw new HttpError(400, `${CHAINS[chain].label} uses ${CHAINS[chain].wallet === "SOL" ? "Solana" : "EVM"} wallets — change the wallet type.`);
+  }
   const validRoles = new Set(ctx.roles.map((r) => r.id)); // termasuk @everyone (ID = guildId)
   data.mentionRoleIds = [...new Set(data.mentionRoleIds)].filter((id) => validRoles.has(id));
 
@@ -236,6 +252,10 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       imageUrl: imageUrl || null,
       winnerRoleId: winnerRoleId || null,
       requireAnyRole: true,
+      winnerCount,
+      chain: chain || null,
+      hostName: user.username,
+      hostAvatar: discordAvatarUrl(user.id, user.avatar),
       createdById: user.id,
     },
   });
@@ -288,11 +308,22 @@ dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res
 dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   const winners = await db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: { createdAt: "asc" } });
+  // GTD dulu, lalu FCFS
+  winners.sort((a, b) => Number(a.allocation === "FCFS") - Number(b.allocation === "FCFS"));
   const withX = hasXTasks(raffle);
   const withWallet = raffle.walletType !== "NONE";
+  // Kolom Allocation hanya kalau raffle-nya punya GTD dan FCFS sekaligus
+  const withAllocation = raffle.gtdCount > 0 && raffle.fcfsCount > 0;
   const rows: Cell[][] = [
-    ["Discord ID", "Discord Username", ...(withX ? ["X Username"] : []), ...(withWallet ? ["Wallet"] : [])],
+    [
+      ...(withAllocation ? ["Allocation"] : []),
+      "Discord ID",
+      "Discord Username",
+      ...(withX ? ["X Username"] : []),
+      ...(withWallet ? ["Wallet"] : []),
+    ],
     ...winners.map((e) => [
+      ...(withAllocation ? [e.allocation] : []),
       e.userId,
       e.username,
       ...(withX ? [e.xUsername ? `@${e.xUsername}` : ""] : []),
