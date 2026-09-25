@@ -90,7 +90,7 @@ export function CreateRafflePage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={`/g/${guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to={`/server/${guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         ← {data.guild.name}
       </Link>
       <h1 className="mb-6 text-2xl font-bold">Create Raffle</h1>

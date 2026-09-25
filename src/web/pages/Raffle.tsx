@@ -65,7 +65,7 @@ export function RafflePage() {
 
   return (
     <div>
-      <Link to={`/g/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to={`/server/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         ← Back to server
       </Link>
       <ErrorBox error={error} />

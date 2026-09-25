@@ -75,7 +75,7 @@ export function GuildPage() {
           {icon && <img src={icon} className="h-12 w-12 rounded-xl" alt="" />}
           <h1 className="text-2xl font-bold">{data.guild.name}</h1>
         </div>
-        <Link to={`/g/${guildId}/new`} className="btn btn-primary">
+        <Link to={`/server/${guildId}/new`} className="btn btn-primary">
           + Create Raffle
         </Link>
       </div>

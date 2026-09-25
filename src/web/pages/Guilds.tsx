@@ -40,7 +40,7 @@ export function GuildsPage() {
           );
           const cls = "card flex items-center gap-3 transition hover:border-zinc-600";
           return g.botPresent ? (
-            <Link key={g.id} to={`/g/${g.id}`} className={cls}>
+            <Link key={g.id} to={`/server/${g.id}`} className={cls}>
               {inner}
             </Link>
           ) : (

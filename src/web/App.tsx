@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, Route, Routes } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
 import { api, avatarUrl, type Me } from "./api";
 import { GuildsPage } from "./pages/Guilds";
 import { GuildPage } from "./pages/Guild";
@@ -44,8 +44,11 @@ export function App() {
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         <Routes>
           <Route path="/" element={<GuildsPage />} />
-          <Route path="/g/:guildId" element={<GuildPage />} />
-          <Route path="/g/:guildId/new" element={<CreateRafflePage />} />
+          <Route path="/server/:guildId" element={<GuildPage />} />
+          <Route path="/server/:guildId/new" element={<CreateRafflePage />} />
+          {/* Link lama (/g/...) tetap jalan */}
+          <Route path="/g/:guildId" element={<OldGuildLink />} />
+          <Route path="/g/:guildId/new" element={<OldGuildLink suffix="/new" />} />
           <Route path="/r/:id" element={<RafflePage />} />
           <Route path="*" element={<p className="text-zinc-400">Page not found.</p>} />
         </Routes>
@@ -53,6 +56,11 @@ export function App() {
       <Footer />
     </div>
   );
+}
+
+function OldGuildLink({ suffix = "" }: { suffix?: string }) {
+  const { guildId } = useParams();
+  return <Navigate to={`/server/${guildId}${suffix}`} replace />;
 }
 
 function Landing() {
