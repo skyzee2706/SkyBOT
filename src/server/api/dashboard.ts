@@ -305,33 +305,28 @@ dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res
 });
 
 // Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
+// ?allocation=GTD / FCFS = file terpisah per allocation; tanpa parameter = semua pemenang (raffle lama).
 dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  const winners = await db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: { createdAt: "asc" } });
-  // GTD dulu, lalu FCFS
-  winners.sort((a, b) => Number(a.allocation === "FCFS") - Number(b.allocation === "FCFS"));
+  const allocation = z.enum(["GTD", "FCFS"]).optional().catch(undefined).parse(req.query.allocation);
+  const winners = await db.entry.findMany({
+    where: { raffleId: raffle.id, status: "WON", ...(allocation ? { allocation } : {}) },
+    orderBy: { createdAt: "asc" },
+  });
   const withX = hasXTasks(raffle);
   const withWallet = raffle.walletType !== "NONE";
-  // Kolom Allocation hanya kalau raffle-nya punya GTD dan FCFS sekaligus
-  const withAllocation = raffle.gtdCount > 0 && raffle.fcfsCount > 0;
   const rows: Cell[][] = [
-    [
-      ...(withAllocation ? ["Allocation"] : []),
-      "Discord ID",
-      "Discord Username",
-      ...(withX ? ["X Username"] : []),
-      ...(withWallet ? ["Wallet"] : []),
-    ],
+    ["Discord ID", "Discord Username", ...(withX ? ["X Username"] : []), ...(withWallet ? ["Wallet"] : [])],
     ...winners.map((e) => [
-      ...(withAllocation ? [e.allocation] : []),
       e.userId,
       e.username,
       ...(withX ? [e.xUsername ? `@${e.xUsername}` : ""] : []),
       ...(withWallet ? [e.wallet] : []),
     ]),
   ];
-  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_winners.xlsx`;
+  const kind = allocation ? `${allocation} Winners` : "Winners";
+  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_${kind.replace(" ", "_").toLowerCase()}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(buildXlsx("Winners", rows));
+  res.send(buildXlsx(kind, rows));
 });
