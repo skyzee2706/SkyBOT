@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { fetchBotGuildIds, fetchMember, fetchTextChannels, getGuildContext } from "../discord.js";
 import { botInviteUrl, xEnabled } from "../env.js";
-import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle, rerollRaffle } from "../raffle/service.js";
+import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle } from "../raffle/service.js";
 import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
@@ -277,13 +277,6 @@ dashboardRouter.post("/raffles/:id/cancel", async (req, res) => {
   res.json({ ok: true });
 });
 
-dashboardRouter.post("/raffles/:id/reroll", async (req, res) => {
-  const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  const count = z.coerce.number().int().min(1).max(100).catch(1).parse(req.body?.count);
-  if (raffle.status !== "ENDED") throw new HttpError(400, "Reroll is only available for ended raffles.");
-  res.json({ winners: await rerollRaffle(raffle.id, count) });
-});
-
 dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   const note = z.string().trim().max(200).catch("").parse(req.body?.note) || "Disqualified by admin";
@@ -291,41 +284,23 @@ dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res
   res.json({ ok: true });
 });
 
-dashboardRouter.get("/raffles/:id/export.xlsx", async (req, res) => {
+// Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
+dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  const onlyWinners = req.query.winners === "1";
-  const entries = await db.entry.findMany({
-    where: { raffleId: raffle.id, ...(onlyWinners ? { status: "WON" } : {}) },
-    orderBy: { createdAt: "asc" },
-  });
-  type Row = (typeof entries)[number];
+  const winners = await db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: { createdAt: "asc" } });
   const withX = hasXTasks(raffle);
   const withWallet = raffle.walletType !== "NONE";
-  // Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
-  type Column = [title: string, value: (e: Row, i: number) => Cell];
-  const xUsername = (e: Row) => (e.xUsername ? `@${e.xUsername}` : "");
-  const columns: Column[] = onlyWinners
-    ? [
-        ["Discord ID", (e) => e.userId],
-        ["Discord Username", (e) => e.username],
-        ...(withX ? [["X Username", xUsername] satisfies Column] : []),
-        ...(withWallet ? [["Wallet", (e: Row) => e.wallet] satisfies Column] : []),
-      ]
-    : [
-        ["No", (_e, i) => i + 1],
-        ["Discord ID", (e) => e.userId],
-        ["Username", (e) => e.username],
-        ["X Username", xUsername],
-        ["X Quote URLs", (e) => (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(", ")],
-        ["Wallet", (e) => e.wallet],
-        ["Status", (e) => e.status],
-        ["Note", (e) => e.note],
-        ["Entered At (UTC)", (e) => e.createdAt],
-      ];
-  const rows: Cell[][] = [columns.map(([title]) => title), ...entries.map((e, i) => columns.map(([, get]) => get(e, i)))];
-  const kind = onlyWinners ? "Winners" : "Entries";
-  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_${kind.toLowerCase()}.xlsx`;
+  const rows: Cell[][] = [
+    ["Discord ID", "Discord Username", ...(withX ? ["X Username"] : []), ...(withWallet ? ["Wallet"] : [])],
+    ...winners.map((e) => [
+      e.userId,
+      e.username,
+      ...(withX ? [e.xUsername ? `@${e.xUsername}` : ""] : []),
+      ...(withWallet ? [e.wallet] : []),
+    ]),
+  ];
+  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_winners.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(buildXlsx(kind, rows));
+  res.send(buildXlsx("Winners", rows));
 });

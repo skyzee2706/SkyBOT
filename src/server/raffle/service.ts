@@ -353,15 +353,6 @@ export async function endOverdueRaffles() {
   return due.length;
 }
 
-export async function rerollRaffle(raffleId: string, count: number) {
-  const raffle = await db.raffle.findUniqueOrThrow({ where: { id: raffleId } });
-  if (raffle.status !== "ENDED") throw new Error("Reroll is only available for ended raffles.");
-  const winners = await pickWinners(raffle, count);
-  await refreshMessage(raffleId);
-  if (winners.length) await announce(raffle, `🔁 **${raffle.title}** reroll! Additional winners:\n`, winners);
-  return winners;
-}
-
 export async function cancelRaffle(raffleId: string) {
   const { count } = await db.raffle.updateMany({
     where: { id: raffleId, status: "ACTIVE" },

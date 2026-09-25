@@ -146,15 +146,7 @@ export function RafflePage() {
               </button>
             </>
           ))}
-        {raffle.status === "ENDED" && (
-          <button className="btn btn-primary" disabled={busy || counts.ENTERED === 0} onClick={() => act("/reroll", { count: 1 })}>
-            {busy ? "Drawing..." : "🔁 Reroll 1 Winner"}
-          </button>
-        )}
-        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.xlsx`}>
-          Export Entries (Excel)
-        </a>
-        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.xlsx?winners=1`}>
+        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
           Export Winners (Excel)
         </a>
       </div>
@@ -240,7 +232,7 @@ export function RafflePage() {
               </tbody>
             </table>
             {shown.length > 500 && (
-              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}. Use Excel export for the full list.</p>
+              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}.</p>
             )}
           </div>
         )}
