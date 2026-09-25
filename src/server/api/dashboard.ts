@@ -4,7 +4,7 @@ import { db } from "../db.js";
 import { fetchBotGuildIds, fetchMember, fetchTextChannels, getGuildContext } from "../discord.js";
 import { botInviteUrl, xEnabled } from "../env.js";
 import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle, rerollRaffle } from "../raffle/service.js";
-import { getXPosts, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
+import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
 import { buildXlsx, type Cell } from "../xlsx.js";
@@ -298,20 +298,31 @@ dashboardRouter.get("/raffles/:id/export.xlsx", async (req, res) => {
     where: { raffleId: raffle.id, ...(onlyWinners ? { status: "WON" } : {}) },
     orderBy: { createdAt: "asc" },
   });
-  const rows: Cell[][] = [
-    ["No", "Discord ID", "Username", "X Username", "X Quote URLs", "Wallet", "Status", "Note", "Entered At (UTC)"],
-    ...entries.map((e, i) => [
-      i + 1,
-      e.userId,
-      e.username,
-      e.xUsername ? `@${e.xUsername}` : "",
-      (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(", "),
-      e.wallet,
-      e.status,
-      e.note,
-      e.createdAt,
-    ]),
-  ];
+  type Row = (typeof entries)[number];
+  const withX = hasXTasks(raffle);
+  const withWallet = raffle.walletType !== "NONE";
+  // Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
+  type Column = [title: string, value: (e: Row, i: number) => Cell];
+  const xUsername = (e: Row) => (e.xUsername ? `@${e.xUsername}` : "");
+  const columns: Column[] = onlyWinners
+    ? [
+        ["Discord ID", (e) => e.userId],
+        ["Discord Username", (e) => e.username],
+        ...(withX ? [["X Username", xUsername] satisfies Column] : []),
+        ...(withWallet ? [["Wallet", (e: Row) => e.wallet] satisfies Column] : []),
+      ]
+    : [
+        ["No", (_e, i) => i + 1],
+        ["Discord ID", (e) => e.userId],
+        ["Username", (e) => e.username],
+        ["X Username", xUsername],
+        ["X Quote URLs", (e) => (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(", ")],
+        ["Wallet", (e) => e.wallet],
+        ["Status", (e) => e.status],
+        ["Note", (e) => e.note],
+        ["Entered At (UTC)", (e) => e.createdAt],
+      ];
+  const rows: Cell[][] = [columns.map(([title]) => title), ...entries.map((e, i) => columns.map(([, get]) => get(e, i)))];
   const kind = onlyWinners ? "Winners" : "Entries";
   const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_${kind.toLowerCase()}.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
