@@ -156,8 +156,7 @@ export function CreateRafflePage() {
           <div>
             <h2 className="font-semibold">X (Twitter) Tasks</h2>
             <p className="hint">
-              Entrants connect their X account, then complete the tasks via buttons. Tasks are <b>not verified
-              automatically</b> — check winners manually using their X username on the raffle page.
+              Entrants connect their X account, then complete the tasks via buttons.
             </p>
           </div>
           {!data.xEnabled ? (
