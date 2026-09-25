@@ -58,7 +58,7 @@ export function DonateModal({ onClose }: { onClose: () => void }) {
           Support development 💜
         </h2>
         <p className="mb-4 mt-1 text-sm text-zinc-400">
-          Enjoying Raffle Bot? Donations help keep it free and growing. Thank you!
+          Enjoying SkyBOT Raffle? Donations help keep it free and growing. Thank you!
         </p>
 
         {qr && <img src={qr} alt="Wallet address QR code" className="mx-auto mb-4 h-44 w-44 rounded-lg bg-white p-2" />}

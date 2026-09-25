@@ -30,7 +30,7 @@ export function App() {
       <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="text-xl">🎟️</span> Raffle Bot
+            <span className="text-xl">🎟️</span> SkyBOT Raffle
           </Link>
           <div className="flex items-center gap-3 text-sm">
             <DonateButton className="hidden sm:inline-flex" />
@@ -61,7 +61,7 @@ function Landing() {
     <div className="flex min-h-screen flex-col">
       <div className="flex flex-1 flex-col items-center justify-center px-4 text-center">
         <div className="mb-4 text-6xl">🎟️</div>
-        <h1 className="mb-3 text-4xl font-bold tracking-tight">Raffle Bot</h1>
+        <h1 className="mb-3 text-4xl font-bold tracking-tight">SkyBOT Raffle</h1>
         <p className="mb-8 max-w-md text-zinc-400">
           Create raffles on the web, post giveaways to Discord automatically, check entry requirements and draw winners
           fairly.
