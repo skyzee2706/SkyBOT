@@ -5,7 +5,7 @@ import { GuildsPage } from "./pages/Guilds";
 import { GuildPage } from "./pages/Guild";
 import { CreateRafflePage } from "./pages/CreateRaffle";
 import { RafflePage } from "./pages/Raffle";
-import { DonateButton, Footer } from "./Credits";
+import { Footer } from "./Credits";
 
 export function App() {
   const [me, setMe] = useState<Me | null | undefined>(undefined);
@@ -33,7 +33,6 @@ export function App() {
             <span className="text-xl">🎟️</span> SkyBOT Raffle
           </Link>
           <div className="flex items-center gap-3 text-sm">
-            <DonateButton className="hidden sm:inline-flex" />
             {avatar && <img src={avatar} className="h-7 w-7 rounded-full" alt="" />}
             <span className="hidden sm:inline text-zinc-300">{me.username}</span>
             <button onClick={logout} className="text-zinc-400 hover:text-zinc-200">
