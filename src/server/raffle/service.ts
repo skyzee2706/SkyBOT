@@ -51,7 +51,11 @@ export async function syncMessageThrottled(raffleId: string) {
 
 export async function publishRaffle(raffle: Raffle) {
   const msg = (await rest.post(Routes.channelMessages(raffle.channelId), {
-    body: await messagePayload(raffle),
+    body: {
+      ...(await messagePayload(raffle)),
+      content: "**NEW RAFFLE** @everyone",
+      allowed_mentions: { parse: ["everyone"] },
+    },
   })) as APIMessage;
   const updated = await db.raffle.update({
     where: { id: raffle.id },
