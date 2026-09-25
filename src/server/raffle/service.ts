@@ -122,10 +122,10 @@ function taskListReply(raffle: Raffle, xUsername: string, userId: string, done: 
   return {
     content:
       `X account: **@${xUsername}**\n` +
-      "1️⃣ Click every task button below and complete it on X — it turns green ✅ once opened\n" +
+      "1️⃣ Complete all tasks below\n" +
       (quotes
-        ? `2️⃣ Copy the link of your quote post${quotes > 1 ? "s" : ""}\n3️⃣ Click **Done, enter me** and paste the link${quotes > 1 ? "s" : ""}`
-        : "2️⃣ Click **Done, enter me**") +
+        ? `2️⃣ Then, click **Done, enter me** and paste the link to your quote post${quotes > 1 ? "s" : ""}`
+        : "2️⃣ Then, click **Done, enter me**") +
       `\n\nProgress: **${doneCount}/${tasks.length}** tasks` +
       (doneCount < tasks.length ? " — **Done, enter me** unlocks when all are green." : " ✅") +
       "\n-# Buttons not updating? Click **Enter** on the raffle again.",
