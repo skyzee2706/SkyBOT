@@ -172,6 +172,7 @@ const createSchema = z.object({
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
   walletType: z.enum(["NONE", "EVM", "SOL"]).default("NONE"),
   winnerRoleId: z.string().optional(),
+  mentionRoleIds: z.array(z.string()).max(20).default([]),
   // Task X: username boleh ditulis "@nama", "nama", atau link profil
   xFollowUsernames: z
     .array(
@@ -201,10 +202,12 @@ const tweetIdFrom = (s: string) => s.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d
 dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const guildId = param(req, "guildId");
   const user = userOf(res);
-  await requireManager(guildId, user.id);
+  const ctx = await requireManager(guildId, user.id);
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
   const { imageUrl, winnerRoleId, xPosts: postInputs, ...data } = parsed.data;
+  const validRoles = new Set(ctx.roles.map((r) => r.id)); // termasuk @everyone (ID = guildId)
+  data.mentionRoleIds = [...new Set(data.mentionRoleIds)].filter((id) => validRoles.has(id));
 
   const xPosts: XPost[] = [];
   for (const [i, p] of postInputs.entries()) {

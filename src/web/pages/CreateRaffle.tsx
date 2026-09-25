@@ -28,6 +28,7 @@ export function CreateRafflePage() {
     minAccountAgeDays: 0,
     walletType: "NONE" as "NONE" | "EVM" | "SOL",
     winnerRoleId: "",
+    mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
   });
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
@@ -113,6 +114,16 @@ export function CreateRafflePage() {
           </div>
           <Field label="End Time" hint="Uses your computer's time zone.">
             <input type="datetime-local" className="input" value={form.endsAt} onChange={(e) => set("endsAt", e.target.value)} required />
+          </Field>
+          <Field
+            label="Mention when posted"
+            hint="Pinged once in the NEW RAFFLE announcement. The bot needs the Mention @everyone permission to ping @everyone or non-mentionable roles."
+          >
+            <RolePicker
+              roles={[{ id: guildId!, name: "everyone", color: 0, assignable: false }, ...data.roles]}
+              value={form.mentionRoleIds}
+              onChange={(v) => set("mentionRoleIds", v)}
+            />
           </Field>
         </section>
 

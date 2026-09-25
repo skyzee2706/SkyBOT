@@ -50,6 +50,7 @@ export type Raffle = {
   minAccountAgeDays: number;
   walletType: "NONE" | "EVM" | "SOL";
   winnerRoleId: string | null;
+  mentionRoleIds: string[];
   xFollowUsernames: string[];
   xPosts: XPost[];
   createdAt: string;
