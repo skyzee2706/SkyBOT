@@ -168,7 +168,6 @@ const createSchema = z.object({
   winnerCount: z.coerce.number().int().min(1, "At least 1 winner").max(1000),
   endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
   requiredRoleIds: z.array(z.string()).default([]),
-  blockedRoleIds: z.array(z.string()).default([]),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
   walletType: z.enum(["NONE", "EVM", "SOL"]).default("NONE"),
   winnerRoleId: z.string().optional(),
@@ -235,6 +234,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       guildId,
       imageUrl: imageUrl || null,
       winnerRoleId: winnerRoleId || null,
+      requireAnyRole: true,
       createdById: user.id,
     },
   });

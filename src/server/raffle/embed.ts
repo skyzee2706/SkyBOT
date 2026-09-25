@@ -21,7 +21,10 @@ function xTaskLines(r: Raffle) {
 export function raffleEmbed(raffle: Raffle, entryCount: number, winnerIds: string[] = []) {
   const ended = raffle.status !== "ACTIVE";
   const reqs: string[] = [];
-  if (raffle.requiredRoleIds.length) reqs.push(`Required role: ${raffle.requiredRoleIds.map((id) => `<@&${id}>`).join(", ")}`);
+  if (raffle.requiredRoleIds.length) {
+    const roles = raffle.requiredRoleIds.map((id) => `<@&${id}>`).join(raffle.requireAnyRole ? " or " : ", ");
+    reqs.push(`${raffle.requireAnyRole && raffle.requiredRoleIds.length > 1 ? "Have one of these roles" : "Required role"}: ${roles}`);
+  }
   if (raffle.blockedRoleIds.length) reqs.push(`Blocked role: ${raffle.blockedRoleIds.map((id) => `<@&${id}>`).join(", ")}`);
   if (raffle.minAccountAgeDays) reqs.push(`Discord account age ≥ ${raffle.minAccountAgeDays} days`);
   if (raffle.walletType !== "NONE") reqs.push(`Submit ${raffle.walletType === "EVM" ? "EVM (0x...)" : "Solana"} wallet`);

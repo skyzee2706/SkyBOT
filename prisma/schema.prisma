@@ -51,7 +51,9 @@ model Raffle {
 
   // Requirements
   requiredRoleIds    String[]
-  blockedRoleIds     String[]
+  blockedRoleIds     String[]   // fitur lama (sudah dihapus dari dashboard), tetap dicek untuk raffle lama
+  // true = cukup punya SALAH SATU required role (raffle baru); false = harus punya semua (raffle lama)
+  requireAnyRole     Boolean    @default(false)
   minAccountAgeDays  Int        @default(0)
   walletType         WalletType @default(NONE)
 

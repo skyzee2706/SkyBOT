@@ -47,6 +47,7 @@ export type Raffle = {
   status: RaffleStatus;
   requiredRoleIds: string[];
   blockedRoleIds: string[];
+  requireAnyRole: boolean;
   minAccountAgeDays: number;
   walletType: "NONE" | "EVM" | "SOL";
   winnerRoleId: string | null;

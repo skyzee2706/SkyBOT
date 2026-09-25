@@ -1,7 +1,7 @@
 import { SnowflakeUtil } from "discord.js";
 import type { Raffle, WalletType } from "@prisma/client";
 
-export type RequirementInput = Pick<Raffle, "requiredRoleIds" | "blockedRoleIds" | "minAccountAgeDays">;
+export type RequirementInput = Pick<Raffle, "requiredRoleIds" | "requireAnyRole" | "blockedRoleIds" | "minAccountAgeDays">;
 
 export type CheckContext = {
   userId: string;
@@ -14,8 +14,13 @@ type Check = (raffle: RequirementInput, ctx: CheckContext) => string | null;
 // Requirement baru (mis. X/Twitter, holding NFT) tinggal ditambah ke daftar ini.
 const checks: Check[] = [
   (r, ctx) => {
+    if (!r.requiredRoleIds.length) return null;
+    const roles = (ids: string[]) => ids.map((id) => `<@&${id}>`).join(", ");
+    if (r.requireAnyRole) {
+      return r.requiredRoleIds.some((id) => ctx.roleIds.includes(id)) ? null : `You need one of these roles: ${roles(r.requiredRoleIds)}`;
+    }
     const missing = r.requiredRoleIds.filter((id) => !ctx.roleIds.includes(id));
-    return missing.length ? `Missing required role: ${missing.map((id) => `<@&${id}>`).join(", ")}` : null;
+    return missing.length ? `Missing required role: ${roles(missing)}` : null;
   },
   (r, ctx) => {
     const blocked = r.blockedRoleIds.filter((id) => ctx.roleIds.includes(id));

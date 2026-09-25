@@ -24,7 +24,6 @@ export function CreateRafflePage() {
     winnerCount: 1,
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
-    blockedRoleIds: [] as string[],
     minAccountAgeDays: 0,
     walletType: "NONE" as "NONE" | "EVM" | "SOL",
     winnerRoleId: "",
@@ -129,11 +128,8 @@ export function CreateRafflePage() {
 
         <section className="card space-y-4">
           <h2 className="font-semibold">Discord Requirements</h2>
-          <Field label="Required roles" hint="Entrants must have ALL selected roles.">
+          <Field label="Required roles (optional)" hint="Entrants need at least ONE of the selected roles. Leave empty = anyone can join.">
             <RolePicker roles={data.roles} value={form.requiredRoleIds} onChange={(v) => set("requiredRoleIds", v)} />
-          </Field>
-          <Field label="Blocked roles" hint="Members with any of these roles can't enter.">
-            <RolePicker roles={data.roles} value={form.blockedRoleIds} onChange={(v) => set("blockedRoleIds", v)} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Minimum Discord account age (days)" hint="0 = no limit. Helps block alt accounts.">
