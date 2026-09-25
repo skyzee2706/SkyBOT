@@ -21,12 +21,27 @@ export function StatusBadge({ status }: { status: RaffleStatus }) {
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${s.cls}`}>{s.label}</span>;
 }
 
-export function Field({ label, hint, children }: { label: string; hint?: string; children: ReactNode }) {
+export function Field({
+  label,
+  hint,
+  required,
+  error,
+  children,
+}: {
+  label: string;
+  hint?: string;
+  required?: boolean; // tampilkan * merah
+  error?: string; // border merah + pesan di bawah field
+  children: ReactNode;
+}) {
   return (
-    <div>
-      <label className="label">{label}</label>
+    <div data-invalid={error ? true : undefined} className={error ? "[&_.input]:border-red-500" : undefined}>
+      <label className="label">
+        {label}
+        {required && <span className="ml-0.5 text-red-500">*</span>}
+      </label>
       {children}
-      {hint && <p className="hint">{hint}</p>}
+      {error ? <p className="mt-1 text-xs text-red-400">{error}</p> : hint && <p className="hint">{hint}</p>}
     </div>
   );
 }

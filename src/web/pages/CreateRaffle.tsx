@@ -30,7 +30,24 @@ export function CreateRafflePage() {
     mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
   });
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => setForm((f) => ({ ...f, [k]: v }));
+  const [errors, setErrors] = useState<Partial<Record<keyof typeof form, string>>>({});
+  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
+    setForm((f) => ({ ...f, [k]: v }));
+    setErrors((e) => (e[k] ? { ...e, [k]: undefined } : e));
+  };
+
+  // Field wajib: kosong = tidak bisa dikirim ke Discord, field-nya ditandai merah.
+  const validate = () => {
+    const e: typeof errors = {};
+    if (!form.title.trim()) e.title = "Title is required";
+    if (!form.channelId) e.channelId = "Please choose a channel";
+    if (!Number.isInteger(form.winnerCount) || form.winnerCount < 1) e.winnerCount = "At least 1 winner";
+    else if (form.winnerCount > 1000) e.winnerCount = "Maximum 1000 winners";
+    const end = new Date(form.endsAt).getTime();
+    if (!form.endsAt || Number.isNaN(end)) e.endsAt = "End time is required";
+    else if (end <= Date.now() + 60_000) e.endsAt = "End time must be at least 1 minute from now";
+    return e;
+  };
 
   useEffect(() => {
     api<GuildDetail>(`/guilds/${guildId}`)
@@ -44,6 +61,13 @@ export function CreateRafflePage() {
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError(null);
+    const found = validate();
+    setErrors(found);
+    if (Object.keys(found).length) {
+      setError("Please fill in the required fields marked in red.");
+      requestAnimationFrame(() => document.querySelector("[data-invalid]")?.scrollIntoView({ behavior: "smooth", block: "center" }));
+      return;
+    }
     setSaving(true);
     try {
       const { x, ...rest } = form;
@@ -72,10 +96,10 @@ export function CreateRafflePage() {
       <h1 className="mb-6 text-2xl font-bold">Create Raffle</h1>
       <ErrorBox error={error} />
 
-      <form onSubmit={submit} className="space-y-6">
+      <form onSubmit={submit} noValidate className="space-y-6">
         <section className="card space-y-4">
           <h2 className="font-semibold">Raffle Info</h2>
-          <Field label="Title">
+          <Field label="Title" required error={errors.title}>
             <input className="input" value={form.title} onChange={(e) => set("title", e.target.value)} required maxLength={200} />
           </Field>
           <Field label="Description" hint="Supports Discord formatting (**bold**, links, etc).">
@@ -90,8 +114,11 @@ export function CreateRafflePage() {
             <ImageInput guildId={guildId!} value={form.imageUrl} onChange={(url) => set("imageUrl", url)} />
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Channel">
+            <Field label="Channel" required error={errors.channelId}>
               <select className="input" value={form.channelId} onChange={(e) => set("channelId", e.target.value)} required>
+                <option value="" disabled>
+                  Choose a channel
+                </option>
                 {data.channels.map((c) => (
                   <option key={c.id} value={c.id}>
                     #{c.name}
@@ -99,7 +126,7 @@ export function CreateRafflePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Number of Winners">
+            <Field label="Number of Winners" required error={errors.winnerCount}>
               <input
                 type="number"
                 min={1}
@@ -111,7 +138,7 @@ export function CreateRafflePage() {
               />
             </Field>
           </div>
-          <Field label="End Time" hint="Uses your computer's time zone.">
+          <Field label="End Time" hint="Uses your computer's time zone." required error={errors.endsAt}>
             <input type="datetime-local" className="input" value={form.endsAt} onChange={(e) => set("endsAt", e.target.value)} required />
           </Field>
           <Field
