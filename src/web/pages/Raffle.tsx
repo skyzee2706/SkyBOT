@@ -146,9 +146,11 @@ export function RafflePage() {
               </button>
             </>
           ))}
-        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
-          Export Winners (Excel)
-        </a>
+        {counts.WON > 0 && (
+          <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
+            Export Winners (Excel)
+          </a>
+        )}
       </div>
 
       <div className="card">
