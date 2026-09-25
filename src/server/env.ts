@@ -38,8 +38,8 @@ export const isLocal = /localhost|127\.0\.0\.1/.test(env.PUBLIC_URL);
 export const xEnabled = !!(env.X_API_KEY && env.X_API_SECRET);
 export const OAUTH_REDIRECT = `${env.PUBLIC_URL}/api/auth/callback`;
 
-// View Channel, Send Messages, Embed Links, Read Message History, Manage Roles
-const BOT_PERMISSIONS = "268520448";
+// View Channel, Send Messages, Embed Links, Read Message History, Mention Everyone, Manage Roles
+const BOT_PERMISSIONS = "268651520";
 export const botInviteUrl = (guildId?: string) =>
   `https://discord.com/oauth2/authorize?client_id=${env.DISCORD_CLIENT_ID}&scope=bot+applications.commands&permissions=${BOT_PERMISSIONS}` +
   (guildId ? `&guild_id=${guildId}&disable_guild_select=true` : "");

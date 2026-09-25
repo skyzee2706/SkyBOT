@@ -66,6 +66,8 @@ model Raffle {
   xQuote           Boolean  @default(false)
 
   winnerRoleId String?
+  // Di-mention saat raffle diposting. ID = guildId berarti @everyone.
+  mentionRoleIds String[]
   createdById  String
   createdAt    DateTime @default(now())
   endedAt      DateTime?

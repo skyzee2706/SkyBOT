@@ -49,9 +49,23 @@ export async function syncMessageThrottled(raffleId: string) {
   if (count) await refreshMessage(raffleId);
 }
 
+// Baris "NEW RAFFLE" + mention yang dipilih di dashboard (ID = guildId berarti @everyone).
+function announcement(raffle: Raffle) {
+  const everyone = raffle.mentionRoleIds.includes(raffle.guildId);
+  const roles = raffle.mentionRoleIds.filter((id) => id !== raffle.guildId);
+  const mentions = [...(everyone ? ["@everyone"] : []), ...roles.map((id) => `<@&${id}>`)];
+  return {
+    content: ["**NEW RAFFLE**", ...mentions].join(" "),
+    allowed_mentions: { parse: everyone ? ["everyone"] : [], roles },
+  };
+}
+
 export async function publishRaffle(raffle: Raffle) {
   const msg = (await rest.post(Routes.channelMessages(raffle.channelId), {
-    body: await messagePayload(raffle),
+    body: {
+      ...(await messagePayload(raffle)),
+      ...announcement(raffle),
+    },
   })) as APIMessage;
   const updated = await db.raffle.update({
     where: { id: raffle.id },
