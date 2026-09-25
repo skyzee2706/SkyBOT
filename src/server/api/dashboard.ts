@@ -8,7 +8,7 @@ import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raf
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
 import { buildXlsx, type Cell, type RowStyle } from "../xlsx.js";
-import { ALLOCATIONS, allocationCount, CHAIN_IDS, CHAINS, hasAllocations } from "../../shared/raffle.js";
+import { ALLOCATIONS, allocationCount, chainLabel, chainWallet, hasAllocations, normalizeChain } from "../../shared/raffle.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -170,7 +170,11 @@ const createSchema = z.object({
   // Allocations: GTD dan/atau FCFS (0 = tidak dipakai), minimal salah satu.
   gtdCount: z.coerce.number().int("GTD must be a whole number").min(0).max(1000, "Maximum 1000 GTD").default(0),
   fcfsCount: z.coerce.number().int("FCFS must be a whole number").min(0).max(1000, "Maximum 1000 FCFS").default(0),
-  chain: z.union([z.literal(""), z.enum(CHAIN_IDS)]).optional(),
+  // ID dari daftar (mis. "ARC") atau nama chain yang ditulis manual
+  chain: z
+    .string({ error: "Chain is required" })
+    .transform(normalizeChain)
+    .refine((s) => s.length > 0, "Chain is required"),
   endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
   requiredRoleIds: z.array(z.string()).default([]),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
@@ -219,8 +223,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
   if (winnerCount > 1000) throw new HttpError(400, "Maximum 1000 allocations in total");
   // Jenis wallet harus sesuai chain (Solana = wallet Solana, chain lain = EVM)
-  if (chain && data.walletType !== "NONE" && data.walletType !== CHAINS[chain].wallet) {
-    throw new HttpError(400, `${CHAINS[chain].label} uses ${CHAINS[chain].wallet === "SOL" ? "Solana" : "EVM"} wallets — change the wallet type.`);
+  const requiredWallet = chainWallet(chain);
+  if (requiredWallet && data.walletType !== "NONE" && data.walletType !== requiredWallet) {
+    throw new HttpError(400, `${chainLabel(chain)} uses ${requiredWallet === "SOL" ? "Solana" : "EVM"} wallets — change the wallet type.`);
   }
   const validRoles = new Set(ctx.roles.map((r) => r.id)); // termasuk @everyone (ID = guildId)
   data.mentionRoleIds = [...new Set(data.mentionRoleIds)].filter((id) => validRoles.has(id));
@@ -253,7 +258,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       winnerRoleId: winnerRoleId || null,
       requireAnyRole: true,
       winnerCount,
-      chain: chain || null,
+      chain,
       hostName: user.username,
       hostAvatar: discordAvatarUrl(user.id, user.avatar),
       createdById: user.id,

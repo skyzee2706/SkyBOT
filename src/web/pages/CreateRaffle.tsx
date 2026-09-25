@@ -4,7 +4,9 @@ import { api, type GuildDetail, type Raffle } from "../api";
 import { ErrorBox, Field, Loading, RolePicker } from "../components";
 import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
 import { ImageInput } from "./ImageInput";
-import { ALLOCATIONS, CHAIN_IDS, CHAINS, type ChainId } from "../../shared/raffle";
+import { ALLOCATIONS, CHAIN_IDS, CHAINS, chainWallet, CUSTOM_CHAIN_MAX, normalizeChain, type ChainId } from "../../shared/raffle";
+
+const OTHER = "__other__";
 
 // Nilai default untuk <input type="datetime-local"> (waktu lokal browser)
 const toLocalInput = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -25,7 +27,8 @@ export function CreateRafflePage() {
     // Allocations: centang GTD dan/atau FCFS, masing-masing dengan jumlah slot
     gtd: { on: true, count: 1 },
     fcfs: { on: false, count: 1 },
-    chain: "" as "" | ChainId,
+    chain: "" as "" | ChainId | typeof OTHER, // wajib
+    customChain: "", // diisi kalau pilih "Other"
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
     minAccountAgeDays: 0,
@@ -41,11 +44,13 @@ export function CreateRafflePage() {
     const key: ErrorKey = k === "gtd" || k === "fcfs" ? "allocations" : k;
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
-  // Jenis wallet mengikuti chain: Solana = wallet Solana, chain lain = EVM
-  const chainWallet = form.chain ? CHAINS[form.chain].wallet : null;
-  const setChain = (chain: "" | ChainId) => {
+  // Jenis wallet mengikuti chain: Solana = wallet Solana, chain lain = EVM. Chain manual boleh keduanya.
+  const chainValue = form.chain === OTHER ? normalizeChain(form.customChain) : form.chain;
+  const requiredWallet = chainWallet(chainValue);
+  const setChain = (chain: typeof form.chain) => {
     set("chain", chain);
-    if (chain && form.walletType !== "NONE") set("walletType", CHAINS[chain].wallet);
+    const w = chain === OTHER ? null : chainWallet(chain);
+    if (w && form.walletType !== "NONE") set("walletType", w);
   };
 
   const allocationTotal = () => (form.gtd.on ? form.gtd.count : 0) + (form.fcfs.on ? form.fcfs.count : 0);
@@ -55,6 +60,8 @@ export function CreateRafflePage() {
     const e: typeof errors = {};
     if (!form.title.trim()) e.title = "Title is required";
     if (!form.channelId) e.channelId = "Please choose a channel";
+    if (!form.chain) e.chain = "Please choose a chain";
+    else if (form.chain === OTHER && !form.customChain.trim()) e.chain = "Type the chain name";
     const picked = ALLOCATIONS.filter((a) => form[a === "GTD" ? "gtd" : "fcfs"].on);
     const bad = picked.find((a) => {
       const n = form[a === "GTD" ? "gtd" : "fcfs"].count;
@@ -90,10 +97,11 @@ export function CreateRafflePage() {
     }
     setSaving(true);
     try {
-      const { x, gtd, fcfs, ...rest } = form;
+      const { x, gtd, fcfs, chain: _chain, customChain: _custom, ...rest } = form;
       const raffle = await api<Raffle>(`/guilds/${guildId}/raffles`, {
         body: {
           ...rest,
+          chain: chainValue,
           gtdCount: gtd.on ? gtd.count : 0,
           fcfsCount: fcfs.on ? fcfs.count : 0,
           endsAt: new Date(form.endsAt).toISOString(),
@@ -148,15 +156,31 @@ export function CreateRafflePage() {
                 ))}
               </select>
             </Field>
-            <Field label="Chain (optional)">
-              <select className="input" value={form.chain} onChange={(e) => setChain(e.target.value as "" | ChainId)}>
-                <option value="">— None —</option>
+            <Field label="Chain" required error={errors.chain}>
+              <select className="input" value={form.chain} onChange={(e) => setChain(e.target.value as typeof form.chain)}>
+                <option value="" disabled>
+                  Choose a chain
+                </option>
                 {CHAIN_IDS.map((c) => (
                   <option key={c} value={c}>
                     {CHAINS[c].label}
                   </option>
                 ))}
+                <option value={OTHER}>Other (type manually)</option>
               </select>
+              {form.chain === OTHER && (
+                <input
+                  className="input mt-2"
+                  placeholder="Chain name, e.g. Monad"
+                  maxLength={CUSTOM_CHAIN_MAX}
+                  value={form.customChain}
+                  onChange={(e) => {
+                    set("customChain", e.target.value);
+                    setErrors((er) => (er.chain ? { ...er, chain: undefined } : er));
+                  }}
+                  autoFocus
+                />
+              )}
             </Field>
           </div>
           <Field
@@ -225,8 +249,8 @@ export function CreateRafflePage() {
             <Field label="Wallet submission">
               <select className="input" value={form.walletType} onChange={(e) => set("walletType", e.target.value as typeof form.walletType)}>
                 <option value="NONE">Not required</option>
-                {chainWallet !== "SOL" && <option value="EVM">EVM wallet (0x...)</option>}
-                {chainWallet !== "EVM" && <option value="SOL">Solana wallet</option>}
+                {requiredWallet !== "SOL" && <option value="EVM">EVM wallet (0x...)</option>}
+                {requiredWallet !== "EVM" && <option value="SOL">Solana wallet</option>}
               </select>
             </Field>
           </div>

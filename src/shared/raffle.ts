@@ -13,8 +13,21 @@ export const CHAINS = {
 export type ChainId = keyof typeof CHAINS;
 export const CHAIN_IDS = Object.keys(CHAINS) as ChainId[];
 
-export const isChainId = (v: unknown): v is ChainId => typeof v === "string" && v in CHAINS;
-export const chainLabel = (v: string | null | undefined) => (isChainId(v) ? CHAINS[v].label : null);
+export const isChainId = (v: unknown): v is ChainId => typeof v === "string" && Object.hasOwn(CHAINS, v);
+export const CUSTOM_CHAIN_MAX = 40;
+
+// Chain disimpan sebagai ID dari daftar (mis. "ARC") atau nama yang ditulis manual (mis. "Monad").
+export const chainLabel = (v: string | null | undefined) => (!v ? null : isChainId(v) ? CHAINS[v].label : v);
+
+// Nama manual yang sama dengan chain di daftar (mis. "base") disamakan jadi ID-nya, supaya aturan wallet tetap berlaku.
+export function normalizeChain(raw: string): string {
+  const name = raw.replace(/\s+/g, " ").trim().slice(0, CUSTOM_CHAIN_MAX);
+  const preset = CHAIN_IDS.find((id) => id === name.toUpperCase() || CHAINS[id].label.toLowerCase() === name.toLowerCase());
+  return preset ?? name;
+}
+
+// Wallet yang wajib dipakai untuk chain ini; null = chain manual (boleh EVM atau Solana)
+export const chainWallet = (v: string | null | undefined) => (isChainId(v) ? CHAINS[v].wallet : null);
 
 export type AllocationType = "GTD" | "FCFS";
 export const ALLOCATIONS: AllocationType[] = ["GTD", "FCFS"];
