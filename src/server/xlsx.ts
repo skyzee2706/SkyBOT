@@ -1,7 +1,8 @@
 import { deflateRawSync } from "node:zlib";
 
 // Pembuat file Excel (.xlsx) minimal tanpa library: file .xlsx = zip berisi beberapa file XML.
-// Baris pertama jadi header (tebal, dibekukan, ada filter). Semua sel teks, kecuali Date (format tanggal Excel).
+// Default: baris pertama jadi header (tebal, dibekukan, ada filter). Bisa juga beberapa tabel dalam satu sheet
+// lewat `rowStyles` (judul tabel + header masing-masing). Semua sel teks, kecuali number / Date.
 
 export type Cell = string | number | Date | null | undefined;
 
@@ -74,29 +75,42 @@ const colName = (i: number): string => (i < 26 ? String.fromCharCode(65 + i) : c
 // Excel menyimpan tanggal sebagai jumlah hari sejak 1899-12-30 (UTC)
 const excelDate = (d: Date) => d.getTime() / 86_400_000 + 25569;
 
-function cellXml(v: Cell, ref: string, header: boolean) {
+export type RowStyle = "header" | "title";
+// Nomor style di styles.xml: 1 = header, 2 = tanggal, 3 = judul tabel
+const STYLE_ID: Record<RowStyle, number> = { header: 1, title: 3 };
+
+function cellXml(v: Cell, ref: string, style: RowStyle | undefined) {
   if (v == null || v === "") return "";
   if (v instanceof Date) return `<c r="${ref}" s="2"><v>${excelDate(v)}</v></c>`;
-  if (typeof v === "number") return `<c r="${ref}"${header ? ' s="1"' : ""}><v>${v}</v></c>`;
-  return `<c r="${ref}" t="inlineStr"${header ? ' s="1"' : ""}><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
+  const s = style ? ` s="${STYLE_ID[style]}"` : "";
+  if (typeof v === "number") return `<c r="${ref}"${s}><v>${v}</v></c>`;
+  return `<c r="${ref}" t="inlineStr"${s}><is><t xml:space="preserve">${esc(v)}</t></is></c>`;
 }
 
-export function buildXlsx(sheetName: string, rows: Cell[][]): Buffer {
+export function buildXlsx(sheetName: string, rows: Cell[][], opts: { rowStyles?: Record<number, RowStyle> } = {}): Buffer {
+  // Tanpa rowStyles = satu tabel biasa: header dibekukan + filter
+  const simple = !opts.rowStyles;
+  const rowStyles = opts.rowStyles ?? { 0: "header" };
   const width = Math.max(1, ...rows.map((r) => r.length));
-  // Lebar kolom kira-kira mengikuti isi terpanjang (maks 60)
+  // Lebar kolom kira-kira mengikuti isi terpanjang (maks 60); baris judul tidak dihitung
   const widths = Array.from({ length: width }, (_, c) =>
-    Math.min(60, Math.max(10, ...rows.map((r) => (r[c] instanceof Date ? 18 : String(r[c] ?? "").length + 2)))),
+    Math.min(
+      60,
+      Math.max(10, ...rows.map((r, ri) => (rowStyles[ri] === "title" ? 0 : r[c] instanceof Date ? 18 : String(r[c] ?? "").length + 2))),
+    ),
   );
   const lastRef = `${colName(width - 1)}${Math.max(1, rows.length)}`;
   const sheet =
     `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
     `<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
-    `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>` +
+    (simple
+      ? `<sheetViews><sheetView workbookViewId="0"><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews>`
+      : `<sheetViews><sheetView workbookViewId="0"/></sheetViews>`) +
     `<cols>${widths.map((w, i) => `<col min="${i + 1}" max="${i + 1}" width="${w}" customWidth="1"/>`).join("")}</cols>` +
     `<sheetData>${rows
-      .map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => cellXml(v, `${colName(ci)}${ri + 1}`, ri === 0)).join("")}</row>`)
+      .map((r, ri) => `<row r="${ri + 1}">${r.map((v, ci) => cellXml(v, `${colName(ci)}${ri + 1}`, rowStyles[ri])).join("")}</row>`)
       .join("")}</sheetData>` +
-    `<autoFilter ref="A1:${lastRef}"/>` +
+    (simple ? `<autoFilter ref="A1:${lastRef}"/>` : "") +
     `</worksheet>`;
 
   const name = esc(sheetName.replace(/[[\]:*?/\\]/g, " ").trim().slice(0, 31) || "Sheet1");
@@ -127,7 +141,9 @@ export function buildXlsx(sheetName: string, rows: Cell[][]): Buffer {
         `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
         `<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">` +
         `<sheets><sheet name="${name}" sheetId="1" r:id="rId1"/></sheets>` +
-        `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${name.replace(/'/g, "''")}'!$A$1:$${colName(width - 1)}$${Math.max(1, rows.length)}</definedName></definedNames>` +
+        (simple
+          ? `<definedNames><definedName name="_xlnm._FilterDatabase" localSheetId="0" hidden="1">'${name.replace(/'/g, "''")}'!$A$1:$${colName(width - 1)}$${Math.max(1, rows.length)}</definedName></definedNames>`
+          : "") +
         `</workbook>`,
     },
     {
@@ -141,20 +157,22 @@ export function buildXlsx(sheetName: string, rows: Cell[][]): Buffer {
     },
     {
       name: "xl/styles.xml",
-      // Style: 0 = biasa, 1 = header tebal berlatar abu, 2 = tanggal
+      // Style: 0 = biasa, 1 = header tebal berlatar abu, 2 = tanggal, 3 = judul tabel (tebal, lebih besar)
       data:
         `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>` +
         `<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">` +
         `<numFmts count="1"><numFmt numFmtId="164" formatCode="yyyy-mm-dd hh:mm"/></numFmts>` +
-        `<fonts count="2"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font></fonts>` +
+        `<fonts count="3"><font><sz val="11"/><name val="Calibri"/></font><font><b/><sz val="11"/><name val="Calibri"/></font>` +
+        `<font><b/><sz val="13"/><name val="Calibri"/></font></fonts>` +
         `<fills count="3"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill>` +
         `<fill><patternFill patternType="solid"><fgColor rgb="FFE4E4E7"/><bgColor indexed="64"/></patternFill></fill></fills>` +
         `<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>` +
         `<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>` +
-        `<cellXfs count="3">` +
+        `<cellXfs count="4">` +
         `<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>` +
         `<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1"/>` +
         `<xf numFmtId="164" fontId="0" fillId="0" borderId="0" xfId="0" applyNumberFormat="1"/>` +
+        `<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>` +
         `</cellXfs>` +
         `<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>` +
         `</styleSheet>`,

@@ -7,8 +7,8 @@ import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle } from "../raff
 import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
-import { buildXlsx, type Cell } from "../xlsx.js";
-import { CHAIN_IDS, CHAINS } from "../../shared/raffle.js";
+import { buildXlsx, type Cell, type RowStyle } from "../xlsx.js";
+import { ALLOCATIONS, allocationCount, CHAIN_IDS, CHAINS, hasAllocations } from "../../shared/raffle.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -305,28 +305,38 @@ dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res
 });
 
 // Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
-// ?allocation=GTD / FCFS = file terpisah per allocation; tanpa parameter = semua pemenang (raffle lama).
+// Export winner: hanya data untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
+// Raffle dengan allocation: satu sheet berisi tabel GTD Winners lalu tabel FCFS Winners (bertumpuk).
 dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  const allocation = z.enum(["GTD", "FCFS"]).optional().catch(undefined).parse(req.query.allocation);
-  const winners = await db.entry.findMany({
-    where: { raffleId: raffle.id, status: "WON", ...(allocation ? { allocation } : {}) },
-    orderBy: { createdAt: "asc" },
-  });
+  const winners = await db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: { createdAt: "asc" } });
   const withX = hasXTasks(raffle);
   const withWallet = raffle.walletType !== "NONE";
-  const rows: Cell[][] = [
-    ["Discord ID", "Discord Username", ...(withX ? ["X Username"] : []), ...(withWallet ? ["Wallet"] : [])],
-    ...winners.map((e) => [
-      e.userId,
-      e.username,
-      ...(withX ? [e.xUsername ? `@${e.xUsername}` : ""] : []),
-      ...(withWallet ? [e.wallet] : []),
-    ]),
+  const header = ["Discord ID", "Discord Username", ...(withX ? ["X Username"] : []), ...(withWallet ? ["Wallet"] : [])];
+  const toRow = (e: (typeof winners)[number]): Cell[] => [
+    e.userId,
+    e.username,
+    ...(withX ? [e.xUsername ? `@${e.xUsername}` : ""] : []),
+    ...(withWallet ? [e.wallet] : []),
   ];
-  const kind = allocation ? `${allocation} Winners` : "Winners";
-  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_${kind.replace(" ", "_").toLowerCase()}.xlsx`;
+  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_winners.xlsx`;
   res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(buildXlsx(kind, rows));
+
+  if (!hasAllocations(raffle)) {
+    res.send(buildXlsx("Winners", [header, ...winners.map(toRow)]));
+    return;
+  }
+  const rows: Cell[][] = [];
+  const rowStyles: Record<number, RowStyle> = {};
+  for (const a of ALLOCATIONS.filter((a) => allocationCount(raffle, a) > 0)) {
+    const group = winners.filter((e) => e.allocation === a);
+    if (rows.length) rows.push([]); // baris kosong pemisah tabel
+    rowStyles[rows.length] = "title";
+    rows.push([`${a} Winners (${group.length})`]);
+    rowStyles[rows.length] = "header";
+    rows.push(header);
+    rows.push(...(group.length ? group.map(toRow) : [["No eligible entrants"]]));
+  }
+  res.send(buildXlsx("Winners", rows, { rowStyles }));
 });

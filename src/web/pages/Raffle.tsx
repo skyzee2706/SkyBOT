@@ -157,20 +157,11 @@ export function RafflePage() {
               </button>
             </>
           ))}
-        {/* Raffle dengan allocation: satu file per GTD / FCFS, tombol muncul kalau sudah ada pemenangnya */}
-        {withAllocations
-          ? usedAllocations
-              .filter((a) => counts[a] > 0)
-              .map((a) => (
-                <a key={a} className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx?allocation=${a}`}>
-                  Export {a} Winners (Excel)
-                </a>
-              ))
-          : winnerCount > 0 && (
-              <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
-                Export Winners (Excel)
-              </a>
-            )}
+        {winnerCount > 0 && (
+          <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/winners.xlsx`}>
+            Export Winners (Excel)
+          </a>
+        )}
       </div>
 
       <div className="card">
