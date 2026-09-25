@@ -149,7 +149,10 @@ interactionsRouter.post("/", async (req, res) => {
   let work: (() => Promise<Reply>) | null = null;
   let updateSameMessage = false;
   if (isButton && action === "enter") {
-    work = flag === "X" ? () => startXTasks(raffleId, entrantOf(gi)) : () => enterRaffle(raffleId, entrantOf(gi));
+    work =
+      flag === "X"
+        ? () => startXTasks(raffleId, entrantOf(gi), { appId: i.application_id, token: i.token })
+        : () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "confirm") {
     // Tombol ada di pesan daftar task (ephemeral) — hasilnya menggantikan pesan itu.
     updateSameMessage = true;

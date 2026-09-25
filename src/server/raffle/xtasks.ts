@@ -1,5 +1,6 @@
 import type { Raffle } from "@prisma/client";
 import { z } from "zod";
+import { intentFollow, intentLike, intentQuote, intentRetweet } from "../x.js";
 
 export const MAX_FOLLOWS = 5;
 export const MAX_POSTS = 5;
@@ -29,3 +30,18 @@ export const quotePosts = (r: XFields) => getXPosts(r).filter((p) => p.quote);
 
 export const hasXTasks = (r: XFields & Pick<Raffle, "xFollowUsernames">) =>
   r.xFollowUsernames.length > 0 || getXPosts(r).some((p) => p.like || p.retweet || p.quote);
+
+export type XTask = { key: string; label: string; url: string };
+
+// Semua task X satu per satu. `key` disimpan di TaskProgress.done saat tombolnya dibuka.
+export function xTaskList(r: XFields & Pick<Raffle, "xFollowUsernames">): XTask[] {
+  const tasks = r.xFollowUsernames.map((u) => ({ key: `f:${u.toLowerCase()}`, label: `Follow @${u}`, url: intentFollow(u) }));
+  const posts = getXPosts(r);
+  posts.forEach((p, i) => {
+    const n = posts.length > 1 ? ` #${i + 1}` : "";
+    if (p.like) tasks.push({ key: `p${i}:like`, label: `❤️ Like${n}`, url: intentLike(p.tweetId) });
+    if (p.retweet) tasks.push({ key: `p${i}:retweet`, label: `🔁 Retweet${n}`, url: intentRetweet(p.tweetId) });
+    if (p.quote) tasks.push({ key: `p${i}:quote`, label: `💬 Quote${n}`, url: intentQuote(p.tweetId) });
+  });
+  return tasks.slice(0, 20); // maks 4 baris tombol task
+}

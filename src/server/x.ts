@@ -79,6 +79,33 @@ export function verifyLinkToken(token: string): string | null {
 export const connectXUrl = (discordId: string) =>
   `${env.PUBLIC_URL}/api/x/connect?t=${encodeURIComponent(createLinkToken(discordId))}`;
 
+// Tombol task tidak langsung ke X, tapi lewat /api/x/task supaya klik-nya tercatat.
+// Token bertanda tangan: [raffleId, discordId, kunci task, kedaluwarsa].
+const TASK_TTL_MS = 12 * 3_600_000;
+const taskKey = createHmac("sha256", env.DISCORD_CLIENT_SECRET).update("x-task").digest();
+export type TaskClick = { raffleId: string; userId: string; task: string };
+
+function createTaskToken({ raffleId, userId, task }: TaskClick) {
+  const payload = Buffer.from(JSON.stringify([raffleId, userId, task, Date.now() + TASK_TTL_MS])).toString("base64url");
+  return `${payload}.${createHmac("sha256", taskKey).update(payload).digest("base64url")}`;
+}
+
+export function verifyTaskToken(token: string): TaskClick | null {
+  const [payload, sig] = token.split(".");
+  if (!payload || !sig) return null;
+  const expected = createHmac("sha256", taskKey).update(payload).digest();
+  const given = Buffer.from(sig, "base64url");
+  if (given.length !== expected.length || !timingSafeEqual(given, expected)) return null;
+  try {
+    const [raffleId, userId, task, exp] = JSON.parse(Buffer.from(payload, "base64url").toString());
+    return Number(exp) > Date.now() ? { raffleId: String(raffleId), userId: String(userId), task: String(task) } : null;
+  } catch {
+    return null;
+  }
+}
+
+export const taskClickUrl = (click: TaskClick) => `${env.PUBLIC_URL}/api/x/task?t=${createTaskToken(click)}`;
+
 // Link "intent" X: membuka X dengan aksi siap dikonfirmasi oleh peserta sendiri (gratis, sesuai aturan X).
 export const intentFollow = (username: string) => `https://x.com/intent/follow?screen_name=${enc(username)}`;
 export const intentLike = (tweetId: string) => `https://x.com/intent/like?tweet_id=${tweetId}`;

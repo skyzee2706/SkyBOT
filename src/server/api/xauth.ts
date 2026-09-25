@@ -1,7 +1,9 @@
 import { Router, type Response } from "express";
+import { waitUntil } from "@vercel/functions";
 import { db } from "../db.js";
 import { xEnabled } from "../env.js";
-import { verifyLinkToken, xAccessToken, xAuthorizeUrl, xRequestToken } from "../x.js";
+import { recordTaskClick, refreshTaskMessage } from "../raffle/service.js";
+import { verifyLinkToken, verifyTaskToken, xAccessToken, xAuthorizeUrl, xRequestToken } from "../x.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -70,4 +72,14 @@ xRouter.get("/callback", async (req, res) => {
     "✅ X account connected",
     `<b>@${esc(x.username)}</b> is now connected. Close this page, go back to Discord and click <b>Enter</b>.`,
   );
+});
+
+// Tombol task di Discord mengarah ke sini: catat bahwa task sudah dibuka, lalu teruskan ke X.
+xRouter.get("/task", async (req, res) => {
+  const click = verifyTaskToken(String(req.query.t ?? ""));
+  if (!click) return page(res, 400, "Link expired", "Click <b>Enter</b> on the raffle again in Discord to get new task buttons.");
+  const url = await recordTaskClick(click);
+  if (!url) return page(res, 404, "Task unavailable", "This raffle has ended or its tasks have changed.");
+  res.redirect(url);
+  waitUntil(refreshTaskMessage(click.raffleId, click.userId).catch((e) => console.error("[x] failed to update task message", e)));
 });

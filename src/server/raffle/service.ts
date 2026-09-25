@@ -3,9 +3,9 @@ import { Routes, type APIMessage } from "discord.js";
 import type { Raffle } from "@prisma/client";
 import { db, isUniqueViolation, uniqueTarget } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
-import { connectXUrl, parseQuoteUrl } from "../x.js";
+import { connectXUrl, parseQuoteUrl, type TaskClick } from "../x.js";
 import { connectXComponents, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
-import { hasXTasks, quotePosts } from "./xtasks.js";
+import { hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
 import { checkRequirements, normalizeWallet } from "./requirements.js";
 import { scheduleDraw } from "./schedule.js";
 
@@ -111,8 +111,30 @@ export async function connectXReply(userId: string): Promise<Reply> {
   };
 }
 
+// Token interaksi Discord berlaku 15 menit; setelah itu pesan task tidak bisa diperbarui lagi.
+const INTERACTION_TOKEN_TTL_MS = 14 * 60_000;
+export type InteractionRef = { appId: string; token: string };
+
+function taskListReply(raffle: Raffle, xUsername: string, userId: string, done: ReadonlySet<string>): Reply {
+  const tasks = xTaskList(raffle);
+  const doneCount = tasks.filter((t) => done.has(t.key)).length;
+  const quotes = quotePosts(raffle).length;
+  return {
+    content:
+      `X account: **@${xUsername}**\n` +
+      "1️⃣ Click every task button below and complete it on X — it turns green ✅ once opened\n" +
+      (quotes
+        ? `2️⃣ Copy the link of your quote post${quotes > 1 ? "s" : ""}\n3️⃣ Click **Done, enter me** and paste the link${quotes > 1 ? "s" : ""}`
+        : "2️⃣ Click **Done, enter me**") +
+      `\n\nProgress: **${doneCount}/${tasks.length}** tasks` +
+      (doneCount < tasks.length ? " — **Done, enter me** unlocks when all are green." : " ✅") +
+      "\n-# Buttons not updating? Click **Enter** on the raffle again.",
+    components: xTaskComponents(raffle, userId, done),
+  };
+}
+
 // Langkah pertama raffle yang punya task X: pastikan akun X terhubung, lalu tampilkan tombol task.
-export async function startXTasks(raffleId: string, who: Entrant): Promise<Reply> {
+export async function startXTasks(raffleId: string, who: Entrant, interaction?: InteractionRef): Promise<Reply> {
   const raffle = await loadForEntry(raffleId, who);
   if (typeof raffle === "string") return raffle;
   const [xLink, existing] = await Promise.all([
@@ -121,16 +143,50 @@ export async function startXTasks(raffleId: string, who: Entrant): Promise<Reply
   ]);
   if (existing) return ALREADY_ENTERED;
   if (!xLink) return notLinkedReply(who.userId);
-  const quotes = quotePosts(raffle).length;
-  return {
-    content:
-      `X account: **@${xLink.xUsername}**\n` +
-      "1️⃣ Click every task button below and complete it on X\n" +
-      (quotes
-        ? `2️⃣ Copy the link of your quote post${quotes > 1 ? "s" : ""}\n3️⃣ Click **Done, enter me** and paste the link${quotes > 1 ? "s" : ""}`
-        : "2️⃣ Click **Done, enter me**"),
-    components: xTaskComponents(raffle),
-  };
+  const ref = interaction
+    ? { appId: interaction.appId, interactionToken: interaction.token, tokenAt: new Date() }
+    : {};
+  const progress = await db.taskProgress.upsert({
+    where: { raffleId_userId: { raffleId, userId: who.userId } },
+    create: { raffleId, userId: who.userId, ...ref },
+    update: ref,
+  });
+  return taskListReply(raffle, xLink.xUsername, who.userId, new Set(progress.done));
+}
+
+// Dipanggil saat peserta membuka tombol task (lewat /api/x/task). Mengembalikan link X tujuan, atau null kalau tidak valid.
+export async function recordTaskClick({ raffleId, userId, task }: TaskClick): Promise<string | null> {
+  const raffle = await db.raffle.findUnique({ where: { id: raffleId } });
+  if (!raffle || raffle.status !== "ACTIVE") return null;
+  const target = xTaskList(raffle).find((t) => t.key === task);
+  if (!target) return null;
+  const progress = await db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId, userId } } });
+  if (!progress) {
+    await db.taskProgress.create({ data: { raffleId, userId, done: [task] } }).catch((e) => {
+      if (!isUniqueViolation(e)) throw e;
+    });
+  } else if (!progress.done.includes(task)) {
+    await db.taskProgress.update({ where: { raffleId_userId: { raffleId, userId } }, data: { done: { push: task } } });
+  }
+  return target.url;
+}
+
+// Perbarui pesan daftar task (ephemeral) supaya tombol yang sudah dibuka jadi hijau.
+export async function refreshTaskMessage(raffleId: string, userId: string) {
+  const [raffle, progress, xLink, entry] = await Promise.all([
+    db.raffle.findUnique({ where: { id: raffleId } }),
+    db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId, userId } } }),
+    db.xLink.findUnique({ where: { discordId: userId } }),
+    db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId } } }),
+  ]);
+  if (!raffle || !progress?.appId || !progress.interactionToken || !progress.tokenAt || !xLink || entry) return;
+  if (Date.now() - progress.tokenAt.getTime() > INTERACTION_TOKEN_TTL_MS) return;
+  const reply = taskListReply(raffle, xLink.xUsername, userId, new Set(progress.done));
+  await rest
+    .patch(Routes.webhookMessage(progress.appId, progress.interactionToken), { body: reply, auth: false })
+    .catch((e) => {
+      if (!isDiscordError(e, 10008, 10015, 50027)) throw e; // pesan dihapus / token kedaluwarsa
+    });
 }
 
 // Validasi link quote untuk tiap post ber-task quote. Mengembalikan pesan error atau daftar link yang sudah dinormalisasi.
@@ -159,6 +215,11 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
     const xLink = await db.xLink.findUnique({ where: { discordId: who.userId } });
     if (!xLink) return notLinkedReply(who.userId);
     xUsername = xLink.xUsername;
+    const progress = await db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId, userId: who.userId } } });
+    const done = new Set(progress?.done);
+    if (!xTaskList(raffle).every((t) => done.has(t.key))) {
+      return "❌ Open every task button first (each one turns green ✅). Click **Enter** on the raffle to see your tasks.";
+    }
     const quotes = validateQuotes(raffle, xLink.xUsername, input.quoteUrls ?? []);
     if (typeof quotes === "string") return quotes;
     xQuoteUrls = quotes;

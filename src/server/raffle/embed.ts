@@ -1,7 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import type { Raffle } from "@prisma/client";
-import { intentFollow, intentLike, intentQuote, intentRetweet, tweetUrl } from "../x.js";
-import { getXPosts, hasXTasks, quotePosts } from "./xtasks.js";
+import { taskClickUrl, tweetUrl } from "../x.js";
+import { getXPosts, hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
 
 export { hasXTasks };
 
@@ -80,19 +80,24 @@ export function raffleButtons(raffle: Raffle) {
 const link = (label: string, url: string) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url);
 
 // Tombol task X (maks 5 per baris) + tombol konfirmasi.
-export function xTaskComponents(raffle: Raffle) {
-  const tasks = raffle.xFollowUsernames.map((u) => link(`Follow @${u}`.slice(0, 80), intentFollow(u)));
-  const posts = getXPosts(raffle);
-  posts.forEach((p, i) => {
-    const n = posts.length > 1 ? ` #${i + 1}` : "";
-    if (p.like) tasks.push(link(`❤️ Like${n}`, intentLike(p.tweetId)));
-    if (p.retweet) tasks.push(link(`🔁 Retweet${n}`, intentRetweet(p.tweetId)));
-    if (p.quote) tasks.push(link(`💬 Quote${n}`, intentQuote(p.tweetId)));
-  });
+// Task yang belum dibuka = tombol link abu-abu; yang sudah = tombol hijau ✅ (nonaktif).
+// "Done, enter me" baru bisa diklik setelah semua task dibuka.
+export function xTaskComponents(raffle: Raffle, userId: string, done: ReadonlySet<string>) {
+  const list = xTaskList(raffle);
+  const tasks = list.map((t) =>
+    done.has(t.key)
+      ? new ButtonBuilder()
+          .setCustomId(`raffle:done:${raffle.id}:${t.key}`)
+          .setLabel(`✅ ${t.label.replace(/^(❤️|🔁|💬) /u, "")}`.slice(0, 80))
+          .setStyle(ButtonStyle.Success)
+          .setDisabled(true)
+      : link(t.label.slice(0, 80), taskClickUrl({ raffleId: raffle.id, userId, task: t.key })),
+  );
+  const allDone = list.every((t) => done.has(t.key));
 
   // Maks 4 baris tombol task (20 tombol) + 1 baris konfirmasi = batas 5 baris Discord
   const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < Math.min(tasks.length, 20); i += 5) {
+  for (let i = 0; i < tasks.length; i += 5) {
     rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(tasks.slice(i, i + 5)));
   }
   const quoteCount = quotePosts(raffle).length;
@@ -101,8 +106,9 @@ export function xTaskComponents(raffle: Raffle) {
       new ButtonBuilder()
         // Q<n> = form perlu n link quote
         .setCustomId(`raffle:confirm:${raffle.id}:${raffle.walletType}:${quoteCount ? `Q${quoteCount}` : "-"}`)
-        .setLabel("✅ Done, enter me")
-        .setStyle(ButtonStyle.Success),
+        .setLabel(allDone ? "✅ Done, enter me" : "🔒 Done, enter me")
+        .setStyle(allDone ? ButtonStyle.Primary : ButtonStyle.Secondary)
+        .setDisabled(!allDone),
     ),
   );
   return rows.map((r) => r.toJSON());

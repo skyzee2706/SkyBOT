@@ -74,7 +74,8 @@ model Raffle {
   // Kapan jumlah peserta di embed Discord terakhir di-update (dibatasi supaya tidak kena rate limit)
   messageSyncedAt DateTime?
 
-  entries Entry[]
+  entries      Entry[]
+  taskProgress TaskProgress[]
 
   @@index([guildId])
   @@index([status])
@@ -107,6 +108,20 @@ model Entry {
 }
 
 // Akun X yang terhubung ke akun Discord (1 akun X hanya untuk 1 akun Discord)
+// Task X yang sudah dibuka peserta (lewat /api/x/task), plus token interaksi Discord
+// untuk memperbarui pesan daftar task-nya (token berlaku 15 menit).
+model TaskProgress {
+  raffleId         String
+  raffle           Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  userId           String
+  done             String[]
+  appId            String?
+  interactionToken String?
+  tokenAt          DateTime?
+
+  @@id([raffleId, userId])
+}
+
 model XLink {
   discordId  String   @id
   xUserId    String   @unique
