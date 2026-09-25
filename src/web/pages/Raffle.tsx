@@ -151,11 +151,11 @@ export function RafflePage() {
             {busy ? "Drawing..." : "🔁 Reroll 1 Winner"}
           </button>
         )}
-        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.csv`}>
-          Export Entries (CSV)
+        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.xlsx`}>
+          Export Entries (Excel)
         </a>
-        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.csv?winners=1`}>
-          Export Winners (CSV)
+        <a className="btn btn-ghost" href={`/api/raffles/${raffle.id}/export.xlsx?winners=1`}>
+          Export Winners (Excel)
         </a>
       </div>
 
@@ -240,7 +240,7 @@ export function RafflePage() {
               </tbody>
             </table>
             {shown.length > 500 && (
-              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}. Use CSV export for the full list.</p>
+              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}. Use Excel export for the full list.</p>
             )}
           </div>
         )}

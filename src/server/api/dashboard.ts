@@ -7,6 +7,7 @@ import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle, rerollRaffle }
 import { getXPosts, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
+import { buildXlsx, type Cell } from "../xlsx.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -290,35 +291,30 @@ dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res
   res.json({ ok: true });
 });
 
-const csvCell = (v: unknown) => {
-  const s = v == null ? "" : String(v);
-  // Cegah formula injection saat dibuka di Excel/Sheets
-  const safe = /^[=+\-@]/.test(s) ? `'${s}` : s;
-  return /[",\n]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
-};
-
-dashboardRouter.get("/raffles/:id/export.csv", async (req, res) => {
+dashboardRouter.get("/raffles/:id/export.xlsx", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   const onlyWinners = req.query.winners === "1";
   const entries = await db.entry.findMany({
     where: { raffleId: raffle.id, ...(onlyWinners ? { status: "WON" } : {}) },
     orderBy: { createdAt: "asc" },
   });
-  const rows = [
-    ["discord_id", "username", "x_username", "x_quote_urls", "wallet", "status", "note", "entered_at"],
-    ...entries.map((e) => [
+  const rows: Cell[][] = [
+    ["No", "Discord ID", "Username", "X Username", "X Quote URLs", "Wallet", "Status", "Note", "Entered At (UTC)"],
+    ...entries.map((e, i) => [
+      i + 1,
       e.userId,
       e.username,
-      e.xUsername,
-      (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(" "),
+      e.xUsername ? `@${e.xUsername}` : "",
+      (e.xQuoteUrls.length ? e.xQuoteUrls : e.xQuoteUrl ? [e.xQuoteUrl] : []).join(", "),
       e.wallet,
       e.status,
       e.note,
-      e.createdAt.toISOString(),
+      e.createdAt,
     ]),
   ];
-  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}${onlyWinners ? "_winners" : "_entries"}.csv`;
-  res.setHeader("Content-Type", "text/csv; charset=utf-8");
+  const kind = onlyWinners ? "Winners" : "Entries";
+  const filename = `${raffle.title.replace(/[^\w-]+/g, "_").slice(0, 50)}_${kind.toLowerCase()}.xlsx`;
+  res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
   res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send("﻿" + rows.map((r) => r.map(csvCell).join(",")).join("\n"));
+  res.send(buildXlsx(kind, rows));
 });
