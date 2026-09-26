@@ -90,7 +90,7 @@ export function ImageInput({ guildId, value, onChange }: { guildId: string; valu
           onDragLeave={() => setDragging(false)}
           onDrop={onDrop}
           className={`flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed px-4 py-8 text-center text-sm transition ${
-            dragging ? "border-indigo-500 bg-indigo-500/10" : "border-zinc-700 hover:border-zinc-500"
+            dragging ? "border-brand-500 bg-brand-500/10" : "border-zinc-700 hover:border-zinc-500"
           }`}
         >
           {busy ? (

@@ -54,7 +54,7 @@ export function DonateModal({ onClose }: { onClose: () => void }) {
         className="w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 text-center"
         onClick={(e) => e.stopPropagation()}
       >
-        <img src={CREATOR.avatar} alt="" className="mx-auto mb-3 h-16 w-16 rounded-full ring-2 ring-indigo-500/60" />
+        <img src={CREATOR.avatar} alt="" className="mx-auto mb-3 h-16 w-16 rounded-full ring-2 ring-brand-500/60" />
         <h2 id="donate-title" className="text-lg font-semibold">
           Support development
         </h2>

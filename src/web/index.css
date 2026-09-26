@@ -1,5 +1,32 @@
 @import "tailwindcss";
 
+/* Tema warna diambil dari logo SkyBOT: oranye rambut + latar gelap */
+@theme {
+  --color-brand-50: #fff6eb;
+  --color-brand-100: #ffe8cc;
+  --color-brand-200: #fdd09a;
+  --color-brand-300: #fbb866;
+  --color-brand-400: #f6a64d;
+  --color-brand-500: #f2963a;
+  --color-brand-600: #d9792a;
+  --color-brand-700: #b45f22;
+  --color-brand-800: #8c4a1e;
+  --color-brand-900: #6b3a1a;
+  --color-brand-950: #3d1f0c;
+  /* Latar gelap senada dengan latar logo */
+  --color-zinc-900: #1b1a21;
+  --color-zinc-950: #121116;
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--color-brand-500);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--color-brand-500) 35%, transparent);
+}
+
 @layer components {
   .card {
     @apply rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5;
@@ -9,7 +36,7 @@
     @apply inline-flex items-center justify-center gap-2 rounded-lg px-4 py-2 text-sm font-medium transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply bg-indigo-500 text-white hover:bg-indigo-400;
+    @apply bg-brand-500 font-semibold text-zinc-950 hover:bg-brand-400;
   }
   .btn-ghost {
     @apply border border-zinc-700 text-zinc-200 hover:bg-zinc-800;
@@ -18,7 +45,7 @@
     @apply border border-red-900 text-red-300 hover:bg-red-950;
   }
   .input {
-    @apply w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-indigo-500;
+    @apply w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-sm outline-none focus:border-brand-500;
   }
   .label {
     @apply mb-1 block text-sm font-medium text-zinc-300;

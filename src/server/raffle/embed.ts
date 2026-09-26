@@ -48,7 +48,7 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
   const embed = new EmbedBuilder()
     .setTitle(`🎉 ${raffle.title}`.slice(0, 256))
     .setURL(`${env.PUBLIC_URL}${publicRafflePath(raffle.id)}`) // judul biru → halaman raffle di web
-    .setColor(raffle.status === "CANCELLED" ? 0x6b7280 : ended ? 0x22c55e : 0x6366f1)
+    .setColor(raffle.status === "CANCELLED" ? 0x6b7280 : ended ? 0x22c55e : 0xf2963a) // oranye = warna brand SkyBOT
     .setFooter({ text: `Raffle ID: ${raffle.id}` });
 
   if (raffle.description) embed.setDescription(raffle.description.slice(0, 4000));

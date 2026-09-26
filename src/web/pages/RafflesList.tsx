@@ -106,8 +106,8 @@ export function RafflesListPage() {
               {r.imageUrl ? (
                 <img src={r.imageUrl} className="h-40 w-full rounded-t-2xl object-cover" alt="" />
               ) : (
-                <div className="grid h-40 w-full place-items-center rounded-t-2xl bg-gradient-to-br from-indigo-900/60 to-zinc-900">
-                  <Ticket className="h-12 w-12 text-indigo-300/70" strokeWidth={1.5} />
+                <div className="grid h-40 w-full place-items-center rounded-t-2xl bg-gradient-to-br from-brand-900/60 to-zinc-900">
+                  <Ticket className="h-12 w-12 text-brand-300/70" strokeWidth={1.5} />
                 </div>
               )}
               <div className="flex flex-1 flex-col gap-2 px-4 pb-4">

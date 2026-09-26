@@ -12,7 +12,7 @@ export function Loading() {
 }
 
 const STATUS: Record<RaffleStatus, { label: string; cls: string }> = {
-  ACTIVE: { label: "Active", cls: "bg-indigo-500/15 text-indigo-300" },
+  ACTIVE: { label: "Active", cls: "bg-brand-500/15 text-brand-300" },
   ENDED: { label: "Ended", cls: "bg-emerald-500/15 text-emerald-300" },
   CANCELLED: { label: "Cancelled", cls: "bg-zinc-700/40 text-zinc-400" },
 };
@@ -87,7 +87,7 @@ export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: s
           {selected.map((r) => (
             <span
               key={r.id}
-              className="inline-flex items-center gap-1 rounded-full border border-indigo-500 bg-indigo-500/20 px-2 py-0.5 text-xs"
+              className="inline-flex items-center gap-1 rounded-full border border-brand-500 bg-brand-500/20 px-2 py-0.5 text-xs"
               style={{ color: roleColor(r.color) }}
             >
               @{r.name}
@@ -126,11 +126,11 @@ export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: s
                   key={r.id}
                   onClick={() => toggle(r.id)}
                   className={`flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-sm hover:bg-zinc-800 ${
-                    on ? "bg-indigo-500/10" : ""
+                    on ? "bg-brand-500/10" : ""
                   }`}
                 >
                   <span style={{ color: roleColor(r.color) }}>@{r.name}</span>
-                  {on && <Check className="h-4 w-4 text-indigo-400" />}
+                  {on && <Check className="h-4 w-4 text-brand-400" />}
                 </button>
               );
             })}

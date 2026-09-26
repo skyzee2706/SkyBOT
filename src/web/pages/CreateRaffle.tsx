@@ -205,7 +205,7 @@ export function CreateRafflePage() {
                 return (
                   <label
                     key={a}
-                    className={`input flex cursor-pointer items-center gap-3 ${v.on ? "border-indigo-500/70" : ""}`}
+                    className={`input flex cursor-pointer items-center gap-3 ${v.on ? "border-brand-500/70" : ""}`}
                   >
                     <input type="checkbox" checked={v.on} onChange={(e) => set(key, { ...v, on: e.target.checked })} />
                     <span className="w-12 font-medium">{a}</span>

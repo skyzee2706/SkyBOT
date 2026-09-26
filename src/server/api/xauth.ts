@@ -15,8 +15,8 @@ const ICON_ERR = `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="#f87171
 function page(res: Response, status: number, title: string, message: string) {
   res.status(status).type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
-<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#09090b;color:#f4f4f5;font:16px system-ui,sans-serif;padding:16px}
-.c{max-width:420px;text-align:center;border:1px solid #27272a;border-radius:16px;padding:32px;background:#18181b}
+<style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121116;color:#f4f4f5;font:16px system-ui,sans-serif;padding:16px}
+.c{max-width:420px;text-align:center;border:1px solid #27272a;border-radius:16px;padding:32px;background:#1b1a21}
 h1{font-size:22px;margin:0 0 12px}p{color:#a1a1aa;line-height:1.5;margin:0}.i{width:48px;height:48px;margin:0 auto 16px}</style></head>
 <body><div class="c">${status < 300 ? ICON_OK : ICON_ERR}<h1>${esc(title)}</h1><p>${message}</p></div></body></html>`);
 }
@@ -65,7 +65,7 @@ xRouter.get("/callback", async (req, res) => {
   }
   const taken = await db.xLink.findUnique({ where: { xUserId: x.userId } });
   if (taken && taken.discordId !== state.discordId) {
-    const back = state.returnTo && safeReturnPath(state.returnTo) ? ` <a href="${state.returnTo}" style="color:#818cf8">Back to the raffle</a>` : "";
+    const back = state.returnTo && safeReturnPath(state.returnTo) ? ` <a href="${state.returnTo}" style="color:#f6a64d">Back to the raffle</a>` : "";
     return page(res, 409, "X account already in use", `<b>@${esc(x.username)}</b> is already connected to another Discord account.${back}`);
   }
   await db.xLink.upsert({

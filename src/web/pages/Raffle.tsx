@@ -113,7 +113,7 @@ export function RafflePage() {
               {raffle.xFollowUsernames.map((u) => (
                 <div key={u}>
                   • Follow{" "}
-                  <a href={`https://x.com/${u}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                  <a href={`https://x.com/${u}`} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">
                     @{u}
                   </a>
                 </div>
@@ -121,7 +121,7 @@ export function RafflePage() {
               {posts.map((p, i) => (
                 <div key={p.tweetId}>
                   • {[p.like && "Like", p.retweet && "Retweet", p.quote && "Quote"].filter(Boolean).join(" + ")}{" "}
-                  <a href={`https://x.com/i/status/${p.tweetId}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                  <a href={`https://x.com/i/status/${p.tweetId}`} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">
                     post #{i + 1} <ExternalLink className="inline h-3.5 w-3.5" />
                   </a>
                 </div>
@@ -132,7 +132,7 @@ export function RafflePage() {
             href={`/raffle/${raffle.id}`}
             target="_blank"
             rel="noreferrer"
-            className="mr-4 mt-3 inline-block text-sm text-indigo-400 hover:underline"
+            className="mr-4 mt-3 inline-block text-sm text-brand-400 hover:underline"
           >
             Public entry page <ExternalLink className="inline h-3.5 w-3.5" />
           </a>
@@ -141,7 +141,7 @@ export function RafflePage() {
               href={`https://discord.com/channels/${raffle.guildId}/${raffle.channelId}/${raffle.messageId}`}
               target="_blank"
               rel="noreferrer"
-              className="mt-3 inline-block text-sm text-indigo-400 hover:underline"
+              className="mt-3 inline-block text-sm text-brand-400 hover:underline"
             >
               View message in Discord <ExternalLink className="inline h-3.5 w-3.5" />
             </a>
@@ -220,7 +220,7 @@ export function RafflePage() {
                     {hasX && (
                       <td className="py-2 pr-4">
                         {e.xUsername && (
-                          <a href={`https://x.com/${e.xUsername}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                          <a href={`https://x.com/${e.xUsername}`} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">
                             @{e.xUsername}
                           </a>
                         )}
@@ -230,7 +230,7 @@ export function RafflePage() {
                       <td className="py-2 pr-4">
                         <div className="flex flex-wrap gap-2">
                           {e.xQuoteUrls.map((url, n) => (
-                            <a key={url} href={url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
+                            <a key={url} href={url} target="_blank" rel="noreferrer" className="text-brand-400 hover:underline">
                               {e.xQuoteUrls.length > 1 ? `#${n + 1}` : "view"} <ExternalLink className="inline h-3.5 w-3.5" />
                             </a>
                           ))}

@@ -120,7 +120,7 @@ function PinForm({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <form onSubmit={submit} className="card mx-auto mt-10 max-w-sm space-y-4 text-center">
-      <Lock className="mx-auto h-8 w-8 text-indigo-400" />
+      <Lock className="mx-auto h-8 w-8 text-brand-400" />
       <h1 className="text-lg font-semibold">Enter admin PIN</h1>
       <input
         className="input text-center text-2xl tracking-[0.5em]"
