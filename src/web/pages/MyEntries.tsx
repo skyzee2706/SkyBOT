@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { CircleCheckBig, Clock, Ticket, Trophy, XCircle } from "lucide-react";
 import { api, setPageTitle } from "../api";
-import { ErrorBox, Loading } from "../components";
+import { ErrorBox, Loading, Pagination } from "../components";
 import { RaffleCard, type RaffleCardData } from "./RafflesList";
 
 type MyEntry = {
@@ -24,36 +24,47 @@ function result(e: MyEntry, now: number) {
   return { icon: Clock, text: "Entered, waiting for the draw", cls: "bg-brand-500/15 text-brand-200 ring-brand-500/30" };
 }
 
-// Semua raffle yang pernah diikuti user + hasilnya
+type Page = {
+  total: number;
+  page: number;
+  totalPages: number;
+  summary: { entered: number; live: number; won: number };
+  entries: MyEntry[];
+};
+
+// Semua raffle yang pernah diikuti user + hasilnya, 10 per halaman (?page=2, dst.)
 export function MyEntriesPage() {
-  const [items, setItems] = useState<MyEntry[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, Number(params.get("page")) || 1);
+  const [data, setData] = useState<Page | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
-
-  const load = useCallback(async (p: number) => {
-    const d = await api<{ total: number; hasMore: boolean; entries: MyEntry[] }>(`/p/me/entries?page=${p}`);
-    setItems((prev) => (p === 0 ? d.entries : [...(prev ?? []), ...d.entries]));
-    setTotal(d.total);
-    setHasMore(d.hasMore);
-    setPage(p);
-  }, []);
 
   useEffect(() => {
     setPageTitle("My entries");
     return () => setPageTitle();
   }, []);
   useEffect(() => {
-    load(0).catch((e) => setError(e.message));
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [load]);
+  }, []);
+  useEffect(() => {
+    setError(null);
+    api<Page>(`/p/me/entries?page=${page}`)
+      .then((d) => {
+        setData(d);
+        // Halaman di luar jangkauan (mis. ?page=99) → ke halaman terakhir
+        if (d.total > 0 && page > d.totalPages) setParams({ page: String(d.totalPages) }, { replace: true });
+      })
+      .catch((e) => setError(e.message));
+  }, [page, setParams]);
 
-  const wins = items?.filter((e) => e.status === "WON").length ?? 0;
-  const active = items?.filter((e) => e.status === "ENTERED" && e.raffle.status === "ACTIVE").length ?? 0;
+  const goTo = (p: number) => {
+    setParams(p === 1 ? {} : { page: String(p) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
+  const items = data?.entries;
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-end justify-between gap-4">
@@ -61,24 +72,24 @@ export function MyEntriesPage() {
           <h1 className="text-2xl font-bold">My entries</h1>
           <p className="text-sm text-zinc-400">Every raffle you've entered, from Discord or the web, and how it turned out.</p>
         </div>
-        {items && items.length > 0 && (
+        {data && data.total > 0 && (
           <div className="flex gap-2 text-sm">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-brand-200 ring-1 ring-brand-500/25">
-              <Ticket className="h-3.5 w-3.5" /> {total} entered
+              <Ticket className="h-3.5 w-3.5" /> {data.summary.entered} entered
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-brand-500/10 px-3 py-1 text-brand-200 ring-1 ring-brand-500/25">
-              <Clock className="h-3.5 w-3.5" /> {active} live
+              <Clock className="h-3.5 w-3.5" /> {data.summary.live} live
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 px-3 py-1 text-emerald-300 ring-1 ring-emerald-500/25">
-              <CircleCheckBig className="h-3.5 w-3.5" /> {wins} won
+              <CircleCheckBig className="h-3.5 w-3.5" /> {data.summary.won} won
             </span>
           </div>
         )}
       </div>
 
       <ErrorBox error={error} />
-      {!items && !error && <Loading />}
-      {items?.length === 0 && (
+      {!data && !error && <Loading />}
+      {data?.total === 0 && (
         <div className="card py-12 text-center">
           <Ticket className="mx-auto h-10 w-10 text-zinc-600" strokeWidth={1.5} />
           <p className="mt-3 text-zinc-400">You haven't entered any raffles yet.</p>
@@ -88,6 +99,11 @@ export function MyEntriesPage() {
         </div>
       )}
 
+      {data && data.total > 0 && (
+        <p className="mb-3 text-xs text-zinc-500">
+          Showing {(data.page - 1) * 10 + 1}–{Math.min(data.page * 10, data.total)} of {data.total}
+        </p>
+      )}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items?.map((e) => {
           const res = result(e, now);
@@ -107,13 +123,7 @@ export function MyEntriesPage() {
         })}
       </div>
 
-      {hasMore && (
-        <div className="mt-6 text-center">
-          <button className="btn btn-ghost" onClick={() => load(page + 1).catch((e) => setError(e.message))}>
-            Load more
-          </button>
-        </div>
-      )}
+      {data && <Pagination page={data.page} totalPages={data.totalPages} onChange={goTo} />}
     </div>
   );
 }

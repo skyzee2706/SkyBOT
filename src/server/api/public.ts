@@ -173,22 +173,30 @@ async function toCards(raffles: (Raffle & { _count: { entries: number } })[]) {
 publicRouter.get("/me/entries", async (req, res) => {
   const user = await currentUser(req);
   if (!user) throw new HttpError(401, "Log in with Discord to see your entries.");
-  const page = Math.max(0, Math.min(1000, Number(req.query.page) || 0));
-  const size = 30;
-  const [entries, total] = await Promise.all([
+  // Per halaman 10 raffle; ?page= mulai dari 1
+  const size = 10;
+  const page = Math.max(1, Math.min(10_000, Number(req.query.page) || 1));
+  const mine = { userId: user.id };
+  const [entries, total, won, live] = await Promise.all([
     db.entry.findMany({
-      where: { userId: user.id },
+      where: mine,
       orderBy: { createdAt: "desc" },
-      skip: page * size,
+      skip: (page - 1) * size,
       take: size,
       include: { raffle: { include: { _count: { select: { entries: true } } } } },
     }),
-    db.entry.count({ where: { userId: user.id } }),
+    db.entry.count({ where: mine }),
+    db.entry.count({ where: { ...mine, status: "WON" } }),
+    db.entry.count({ where: { ...mine, status: "ENTERED", raffle: { status: "ACTIVE", endsAt: { gt: new Date() } } } }),
   ]);
   const cards = await toCards(entries.map((e) => e.raffle));
   res.json({
     total,
-    hasMore: (page + 1) * size < total,
+    page,
+    pageSize: size,
+    totalPages: Math.max(1, Math.ceil(total / size)),
+    // Ringkasan dihitung dari SEMUA entry, bukan hanya halaman ini
+    summary: { entered: total, live, won },
     entries: entries.map((e, i) => ({
       enteredAt: e.createdAt,
       status: e.status,

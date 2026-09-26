@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RaffleStatus, Role } from "./api";
-import { Check, ChevronDown, X } from "lucide-react";
+import { Check, ChevronDown, ChevronLeft, ChevronRight, X } from "lucide-react";
 
 export function ErrorBox({ error }: { error: string | null }) {
   if (!error) return null;
@@ -138,5 +138,56 @@ export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: s
         </div>
       )}
     </div>
+  );
+}
+
+// Nomor halaman yang ditampilkan: 1 … 4 5 6 … 12
+function pageItems(page: number, totalPages: number): (number | "gap")[] {
+  const keep = new Set([1, totalPages, page - 1, page, page + 1].filter((n) => n >= 1 && n <= totalPages));
+  const sorted = [...keep].sort((a, b) => a - b);
+  const out: (number | "gap")[] = [];
+  sorted.forEach((n, i) => {
+    if (i > 0 && n - sorted[i - 1] > 1) out.push(n - sorted[i - 1] === 2 ? n - 1 : "gap");
+    out.push(n);
+  });
+  return out;
+}
+
+export function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+  if (totalPages <= 1) return null;
+  const btn = "grid h-9 min-w-9 place-items-center rounded-lg px-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-40";
+  return (
+    <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+      <button className={`${btn} ring-1 ring-zinc-800 hover:ring-brand-500/50`} disabled={page <= 1} onClick={() => onChange(page - 1)}>
+        <ChevronLeft className="h-4 w-4" />
+        <span className="sr-only">Previous page</span>
+      </button>
+      {pageItems(page, totalPages).map((n, i) =>
+        n === "gap" ? (
+          <span key={`gap${i}`} className="px-1 text-zinc-500">
+            …
+          </span>
+        ) : (
+          <button
+            key={n}
+            onClick={() => onChange(n)}
+            aria-current={n === page ? "page" : undefined}
+            className={`${btn} ${
+              n === page ? "bg-brand-500 font-semibold text-zinc-950" : "text-zinc-300 ring-1 ring-zinc-800 hover:ring-brand-500/50"
+            }`}
+          >
+            {n}
+          </button>
+        ),
+      )}
+      <button
+        className={`${btn} ring-1 ring-zinc-800 hover:ring-brand-500/50`}
+        disabled={page >= totalPages}
+        onClick={() => onChange(page + 1)}
+      >
+        <ChevronRight className="h-4 w-4" />
+        <span className="sr-only">Next page</span>
+      </button>
+    </nav>
   );
 }
