@@ -58,7 +58,7 @@ export function ImageInput({ guildId, value, onChange }: { guildId: string; valu
             key={m}
             type="button"
             onClick={() => setMode(m)}
-            className={`rounded-md px-2.5 py-1 ${mode === m ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            className={`rounded-md px-2.5 py-1 ${mode === m ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"}`}
           >
             {m === "upload" ? "Upload" : "Paste link"}
           </button>

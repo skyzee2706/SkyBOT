@@ -95,7 +95,7 @@ export function GuildPage() {
             <Link
               key={r.id}
               to={`/r/${r.id}`}
-              className="card flex flex-wrap items-center gap-4 transition hover:border-zinc-600"
+              className="card flex flex-wrap items-center gap-4 transition hover:border-brand-500/50"
             >
               {r.imageUrl && <img src={r.imageUrl} className="h-14 w-14 rounded-lg object-cover" alt="" />}
               <div className="min-w-0 flex-1">

@@ -204,7 +204,7 @@ export function PublicRafflePage() {
 function Info({ label, value, sub }: { label: string; value: string; sub?: string }) {
   return (
     <div className="card p-4">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-brand-300/80">{label}</div>
       <div className="mt-1 font-semibold">{value}</div>
       {sub && <div className="mt-0.5 text-xs text-zinc-500">{sub}</div>}
     </div>

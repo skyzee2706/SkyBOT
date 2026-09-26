@@ -185,7 +185,7 @@ export function RafflePage() {
               <button
                 key={f}
                 onClick={() => setFilter(f)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${filter === f ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                className={`rounded-lg px-3 py-1.5 text-sm ${filter === f ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"}`}
               >
                 {filterLabel(f)} ({counts[f]})
               </button>

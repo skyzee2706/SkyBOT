@@ -13,9 +13,30 @@
   --color-brand-800: #8c4a1e;
   --color-brand-900: #6b3a1a;
   --color-brand-950: #3d1f0c;
-  /* Latar gelap senada dengan latar logo */
-  --color-zinc-900: #1b1a21;
-  --color-zinc-950: #121116;
+  /* Netral hangat (krem → coklat gelap) dengan dasar hitam, senada dengan logo */
+  --color-zinc-50: #fbf8f3;
+  --color-zinc-100: #f6efe4;
+  --color-zinc-200: #eadfce;
+  --color-zinc-300: #d8c8b2;
+  --color-zinc-400: #ad9c86;
+  --color-zinc-500: #827462;
+  --color-zinc-600: #5d5246;
+  --color-zinc-700: #41382f;
+  --color-zinc-800: #2b2520;
+  --color-zinc-900: #1b1714;
+  --color-zinc-950: #100e0c;
+}
+
+body {
+  background:
+    radial-gradient(1200px 500px at 50% -200px, color-mix(in srgb, var(--color-brand-500) 10%, transparent), transparent),
+    var(--color-zinc-950);
+  background-attachment: fixed;
+}
+
+h1,
+h2 {
+  color: var(--color-brand-100);
 }
 
 input[type="checkbox"],
@@ -29,7 +50,7 @@ input[type="radio"] {
 
 @layer components {
   .card {
-    @apply rounded-2xl border border-zinc-800 bg-zinc-900/60 p-5;
+    @apply rounded-2xl border border-zinc-800 bg-zinc-900/70 p-5 shadow-[inset_0_1px_0_0_rgb(242_150_58/0.08)];
   }
   /* Pakai bersama varian: class="btn btn-primary" */
   .btn {
@@ -39,7 +60,7 @@ input[type="radio"] {
     @apply bg-brand-500 font-semibold text-zinc-950 hover:bg-brand-400;
   }
   .btn-ghost {
-    @apply border border-zinc-700 text-zinc-200 hover:bg-zinc-800;
+    @apply border border-zinc-700 text-zinc-200 hover:border-brand-500/50 hover:bg-brand-500/10 hover:text-brand-100;
   }
   .btn-danger {
     @apply border border-red-900 text-red-300 hover:bg-red-950;

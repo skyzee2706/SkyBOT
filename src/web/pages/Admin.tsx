@@ -68,7 +68,7 @@ export function AdminPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="border-b border-zinc-800 bg-zinc-950/80">
+      <header className="border-b border-brand-500/20 bg-zinc-950/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-semibold">
             <LogoMark /> SkyBOT Raffle <span className="text-sm font-normal text-zinc-500">· Admin</span>
@@ -143,7 +143,7 @@ function PinForm({ onUnlock }: { onUnlock: () => void }) {
 function Stat({ label, value, sub }: { label: string; value: number | string; sub?: string }) {
   return (
     <div className="card">
-      <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+      <div className="text-xs uppercase tracking-wide text-brand-300/80">{label}</div>
       <div className="mt-1 text-3xl font-semibold tabular-nums">{value}</div>
       {sub && <div className="mt-1 text-xs text-zinc-500">{sub}</div>}
     </div>
@@ -203,7 +203,7 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
               <button
                 key={k}
                 onClick={() => setTab(k)}
-                className={`rounded-lg px-3 py-1.5 text-sm ${tab === k ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                className={`rounded-lg px-3 py-1.5 text-sm ${tab === k ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"}`}
               >
                 {label}
               </button>

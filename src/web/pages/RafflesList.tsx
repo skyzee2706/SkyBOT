@@ -79,7 +79,7 @@ export function RafflesListPage() {
           <button
             key={t}
             onClick={() => setParams(t === "live" ? {} : { tab: t })}
-            className={`rounded-lg px-4 py-1.5 text-sm ${tab === t ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+            className={`rounded-lg px-4 py-1.5 text-sm ${tab === t ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"}`}
           >
             {t === "live" ? (
               <span className="inline-flex items-center gap-2">
@@ -102,7 +102,7 @@ export function RafflesListPage() {
         {items?.map((r) => {
           const live = r.status === "ACTIVE" && new Date(r.endsAt).getTime() > now;
           return (
-            <Link key={r.id} to={`/raffle/${r.id}`} className="card flex flex-col gap-3 p-0 transition hover:border-zinc-600">
+            <Link key={r.id} to={`/raffle/${r.id}`} className="card flex flex-col gap-3 p-0 transition hover:border-brand-500/50">
               {r.imageUrl ? (
                 <img src={r.imageUrl} className="h-40 w-full rounded-t-2xl object-cover" alt="" />
               ) : (
@@ -121,12 +121,12 @@ export function RafflesListPage() {
                 </div>
                 <div className="line-clamp-2 font-semibold">{r.title}</div>
                 <div className="flex flex-wrap gap-1.5 text-xs">
-                  <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-zinc-300">{r.allocations}</span>
-                  {r.chain && <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-zinc-300">{r.chain}</span>}
+                  <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-brand-200 ring-1 ring-brand-500/20">{r.allocations}</span>
+                  {r.chain && <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-brand-200 ring-1 ring-brand-500/20">{r.chain}</span>}
                 </div>
                 <div className="mt-auto flex items-center justify-between pt-1 text-xs text-zinc-400">
                   <span>{r.entryCount} entr{r.entryCount === 1 ? "y" : "ies"}</span>
-                  <span className={live ? "font-medium text-emerald-400" : ""}>
+                  <span className={live ? "font-medium text-emerald-400" : "text-red-300/80"}>
                     {live ? `Ends in ${timeLeft(r.endsAt, now)}` : `Ended ${formatDate(r.endedAt ?? r.endsAt)}`}
                   </span>
                 </div>

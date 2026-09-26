@@ -12,8 +12,8 @@ export function Loading() {
 }
 
 const STATUS: Record<RaffleStatus, { label: string; cls: string }> = {
-  ACTIVE: { label: "Active", cls: "bg-brand-500/15 text-brand-300" },
-  ENDED: { label: "Ended", cls: "bg-emerald-500/15 text-emerald-300" },
+  ACTIVE: { label: "Active", cls: "bg-emerald-500/15 text-emerald-300 ring-1 ring-emerald-500/30" },
+  ENDED: { label: "Ended", cls: "bg-red-500/15 text-red-300 ring-1 ring-red-500/30" },
   CANCELLED: { label: "Cancelled", cls: "bg-zinc-700/40 text-zinc-400" },
 };
 

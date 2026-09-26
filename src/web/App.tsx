@@ -73,15 +73,15 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
   };
 
   const nav = ({ isActive }: { isActive: boolean }) =>
-    `rounded-lg px-3 py-1.5 text-sm ${isActive ? "bg-zinc-800 text-white" : "text-zinc-400 hover:text-zinc-200"}`;
+    `rounded-lg px-3 py-1.5 text-sm ${isActive ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"}`;
   const avatar = me ? avatarUrl(me) : null;
 
   return (
-    <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
+    <header className="border-b border-brand-500/20 bg-zinc-950/80 backdrop-blur">
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-1 sm:gap-4">
           <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
-            <LogoMark /> <span className="hidden sm:inline">SkyBOT Raffle</span>
+            <LogoMark /> <span className="hidden text-brand-50 sm:inline">SkyBOT <span className="text-brand-400">Raffle</span></span>
           </Link>
           <NavLink to="/" end className={nav}>
             Raffles
