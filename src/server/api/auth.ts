@@ -67,8 +67,8 @@ authRouter.get("/callback", async (req, res) => {
   const username = u.global_name ?? u.username;
   await db.user.upsert({
     where: { id: u.id },
-    create: { id: u.id, username, avatar: u.avatar },
-    update: { username, avatar: u.avatar },
+    create: { id: u.id, username, avatar: u.avatar, lastLoginAt: new Date() },
+    update: { username, avatar: u.avatar, lastLoginAt: new Date() },
   });
 
   const sid = randomBytes(32).toString("hex");

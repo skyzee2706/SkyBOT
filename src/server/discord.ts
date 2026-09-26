@@ -32,17 +32,22 @@ export async function fetchMember(guildId: string, userId: string): Promise<APIG
   }
 }
 
-export async function fetchBotGuildIds(): Promise<Set<string>> {
-  const ids = new Set<string>();
+export type BotGuild = { id: string; name: string; icon: string | null };
+
+// Semua server tempat bot berada
+export async function fetchBotGuilds(): Promise<BotGuild[]> {
+  const guilds: BotGuild[] = [];
   let after: string | undefined;
   for (;;) {
     const query = new URLSearchParams({ limit: "200", ...(after ? { after } : {}) });
-    const page = (await rest.get(Routes.userGuilds(), { query })) as { id: string }[];
-    page.forEach((g) => ids.add(g.id));
-    if (page.length < 200) return ids;
+    const page = (await rest.get(Routes.userGuilds(), { query })) as BotGuild[];
+    guilds.push(...page.map(({ id, name, icon }) => ({ id, name, icon })));
+    if (page.length < 200) return guilds;
     after = page[page.length - 1].id;
   }
 }
+
+export const fetchBotGuildIds = async () => new Set((await fetchBotGuilds()).map((g) => g.id));
 
 const MANAGE = PermissionFlagsBits.Administrator | PermissionFlagsBits.ManageGuild;
 

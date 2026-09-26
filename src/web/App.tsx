@@ -1,26 +1,31 @@
 import { useEffect, useState } from "react";
-import { Link, Navigate, Route, Routes, useParams } from "react-router-dom";
+import { Link, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { api, avatarUrl, type Me } from "./api";
 import { GuildsPage } from "./pages/Guilds";
 import { GuildPage } from "./pages/Guild";
 import { CreateRafflePage } from "./pages/CreateRaffle";
 import { RafflePage } from "./pages/Raffle";
 import { Footer } from "./Credits";
+import { AdminPage } from "./pages/Admin";
 
 export function App() {
+  const { pathname } = useLocation();
+  const isAdmin = pathname.replace(/\/$/, "") === "/admin";
   const [me, setMe] = useState<Me | null | undefined>(undefined);
 
   useEffect(() => {
+    if (isAdmin) return; // halaman admin tidak butuh login Discord
     api<Me>("/me")
       .then(setMe)
       .catch(() => setMe(null));
-  }, []);
+  }, [isAdmin]);
 
   const logout = async () => {
     await api("/auth/logout", { method: "POST" });
     setMe(null);
   };
 
+  if (isAdmin) return <AdminPage />;
   if (me === undefined) return <div className="p-10 text-center text-zinc-500">Loading...</div>;
   if (me === null) return <Landing />;
 
