@@ -62,7 +62,7 @@ re-verified against Discord, and the results are announced in the channel, split
 - **Server membership**, configurable per raffle (members only, or open to everyone on the web)
 - **Required roles** (entrants need at least one)
 - **Minimum Discord account age** to discourage alt accounts
-- **Wallet submission** (EVM or Solana), unique per raffle and matched to the chain
+- **Wallet** (EVM or Solana, matched to the chain), saved once per account and reused for every raffle
 - **X (Twitter) tasks**: follow, like, retweet and quote, with tracked task links
 
 </td>
@@ -77,6 +77,7 @@ re-verified against Discord, and the results are announced in the channel, split
 - **My Entries** page (10 per page) to track every raffle entered and every spot won, including past raffles
 - **Enter from the browser** with the same rules as Discord
 - Public **entrant list** (Discord name and avatar only) with winner badges
+- **Connect Wallet** and **Connect X** from the account menu, used automatically on every entry
 - Countdown timers, invite-link "Join server" flow, and mobile-friendly layout
 
 </td>
@@ -128,7 +129,7 @@ sequenceDiagram
 - Ending a raffle is an atomic `ACTIVE → ENDED` transition, so a draw can never run twice.
 - Every winner is re-checked at draw time (server membership, roles, account age). Anyone who no longer qualifies is
   disqualified and replaced automatically.
-- One entry per Discord account, one wallet per raffle, and one X account per Discord account.
+- One entry per Discord account, and each wallet and X account can be linked to only one Discord account.
 
 ## Tech stack
 

@@ -121,7 +121,7 @@ export function XTasksEditor({ value, onChange }: { value: XTasksValue; onChange
         >
           + Add post {value.posts.length >= MAX_POSTS && `(max ${MAX_POSTS})`}
         </button>
-        <p className="hint">Quote posts + wallet submission can't exceed 5 in total (Discord form limit).</p>
+        <p className="hint">Maximum 4 Quote posts per raffle.</p>
       </div>
 
       <TaskPreview value={value} />

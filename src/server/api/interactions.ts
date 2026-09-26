@@ -173,11 +173,6 @@ interactionsRouter.post("/", async (req, res) => {
   const quoteCount = flag?.startsWith("Q") ? Math.min(5, Number(flag.slice(1)) || 1) : 0;
 
   // Form (modal) harus jadi respons pertama (maks 3 detik).
-  // Enter tanpa task X → langsung form wallet tanpa query database. Dengan task X → lihat di bawah.
-  if (isButton && action === "enter" && flag !== "X" && needsWallet) {
-    res.json(entryModal(raffleId, walletType, 0));
-    return;
-  }
   if (isButton && action === "confirm" && (needsWallet || quoteCount)) {
     res.json(entryModal(raffleId, walletType, quoteCount));
     return;
@@ -185,10 +180,11 @@ interactionsRouter.post("/", async (req, res) => {
 
   let work: (() => Promise<Reply>) | null = null;
   let updateSameMessage = false;
-  if (isButton && action === "enter" && flag === "X") {
-    // Raffle dengan task X: cukup Enter. Belum connect X → tombol Connect X; perlu wallet / link quote → form.
+  if (isButton && action === "enter" && (flag === "X" || needsWallet)) {
+    // Cukup Enter. Belum connect X → tombol Connect X; belum punya wallet tersimpan / ada link quote → form.
+    const roleIds = gi.member.roles;
     const step = await withTimeout(
-      discordEntryStep(raffleId, gi.member.user.id).catch(() => null),
+      discordEntryStep(raffleId, gi.member.user.id, roleIds).catch(() => null),
       2000,
     );
     if (step?.kind === "form") {
@@ -203,7 +199,7 @@ interactionsRouter.post("/", async (req, res) => {
       ? () => enterRaffle(raffleId, entrantOf(gi))
       : async () => {
           // Database lambat: tentukan langkahnya setelah defer
-          const s = await discordEntryStep(raffleId, gi.member.user.id);
+          const s = await discordEntryStep(raffleId, gi.member.user.id, roleIds);
           if (s.kind === "reply") return s.reply;
           if (s.kind === "form") return continueReply(raffleId, s);
           return enterRaffle(raffleId, entrantOf(gi));

@@ -8,7 +8,17 @@ import { connectXUrl, taskClickUrl } from "../x.js";
 import { endRaffle, enterRaffle, type Reply } from "../raffle/service.js";
 import { checkRequirements } from "../raffle/requirements.js";
 import { hasXTasks, quotePosts, xTaskList } from "../raffle/xtasks.js";
-import { allocationSummary, CHAIN_IDS, chainLabel, discordAvatarUrl, isChainId, publicRafflePath } from "../../shared/raffle.js";
+import {
+  allocationSummary,
+  CHAIN_IDS,
+  chainLabel,
+  discordAvatarUrl,
+  isChainId,
+  publicRafflePath,
+  safeReturnPath,
+} from "../../shared/raffle.js";
+import { saveWallet, savedWallet } from "../raffle/wallets.js";
+import { xEnabled } from "../env.js";
 import { currentUser } from "./auth.js";
 import { canManageGuild, HttpError } from "./dashboard.js";
 
@@ -204,6 +214,33 @@ publicRouter.get("/me/entries", async (req, res) => {
   });
 });
 
+// Profil user yang login: wallet tersimpan + akun X (menu akun di pojok kanan atas)
+publicRouter.get("/me/profile", async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Not logged in");
+  const [wallets, xLink] = await Promise.all([
+    db.userWallet.findUnique({ where: { discordId: user.id } }),
+    db.xLink.findUnique({ where: { discordId: user.id } }),
+  ]);
+  res.json({
+    wallets: { EVM: wallets?.evm ?? null, SOL: wallets?.sol ?? null },
+    xUsername: xLink?.xUsername ?? null,
+    connectXUrl: xEnabled ? connectXUrl(user.id, safeReturnPath(req.query.r) ?? "/") : null,
+  });
+});
+
+const walletSchema = z.object({ type: z.enum(["EVM", "SOL"]), address: z.string().max(100) });
+
+publicRouter.post("/me/wallet", async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Log in with Discord first.");
+  const input = walletSchema.safeParse(req.body ?? {});
+  if (!input.success) throw new HttpError(400, "Invalid form data.");
+  const saved = await saveWallet(user.id, input.data.type, input.data.address);
+  if ("error" in saved) throw new HttpError(400, saved.error);
+  res.json({ ok: true, wallet: saved.wallet });
+});
+
 // Daftar peserta publik: hanya username + foto Discord (+ tanda pemenang). Wallet, X & link quote hanya untuk host.
 publicRouter.get("/raffles/:id/entries", async (req, res) => {
   const raffle = await db.raffle.findUnique({ where: { id: String(req.params.id) }, select: { id: true, status: true } });
@@ -283,11 +320,12 @@ publicRouter.get("/raffles/:id", async (req, res) => {
 
 // Status peserta yang sedang melihat: sudah ikut? memenuhi syarat? task mana yang sudah dibuka?
 async function viewerState(raffle: Raffle, userId: string) {
-  const [entry, member, xLink, progress] = await Promise.all([
+  const [entry, member, xLink, progress, wallet] = await Promise.all([
     db.entry.findUnique({ where: { raffleId_userId: { raffleId: raffle.id, userId } } }),
     raffle.status === "ACTIVE" ? fetchMember(raffle.guildId, userId) : Promise.resolve(null),
     db.xLink.findUnique({ where: { discordId: userId } }),
     db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId: raffle.id, userId } } }),
+    savedWallet(userId, raffle.walletType),
   ]);
   const guild = await guildInfo(raffle.guildId);
   const done = new Set(progress?.done);
@@ -302,6 +340,7 @@ async function viewerState(raffle: Raffle, userId: string) {
       member || !raffle.requireMember
         ? checkRequirements(raffle, { userId, roleIds: member?.roles ?? [] }).map((e) => plainText(e, guild))
         : [],
+    wallet,
     xUsername: xLink?.xUsername ?? null,
     connectXUrl: hasXTasks(raffle) ? connectXUrl(userId, returnTo) : null,
     tasks: xTaskList(raffle).map((t) => ({

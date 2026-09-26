@@ -200,7 +200,6 @@ const createSchema = z.object({
     )
     .optional(),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
-  walletType: z.enum(["NONE", "EVM", "SOL"]).default("NONE"),
   winnerRoleId: z.string().optional(),
   mentionRoleIds: z.array(z.string()).max(20).default([]),
   // Task X: username boleh ditulis "@nama", "nama", atau link profil
@@ -242,11 +241,8 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const winnerCount = data.gtdCount + data.fcfsCount;
   if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
   if (winnerCount > 1000) throw new HttpError(400, "Maximum 1000 allocations in total");
-  // Jenis wallet harus sesuai chain (Solana = wallet Solana, chain lain = EVM)
-  const requiredWallet = chainWallet(chain);
-  if (requiredWallet && data.walletType !== "NONE" && data.walletType !== requiredWallet) {
-    throw new HttpError(400, `${chainLabel(chain)} uses ${requiredWallet === "SOL" ? "Solana" : "EVM"} wallets — change the wallet type.`);
-  }
+  // Wallet selalu diminta, jenisnya mengikuti chain (Solana = wallet Solana, chain lain / manual = EVM)
+  const walletType = chainWallet(chain) ?? "EVM";
   const validRoles = new Set(ctx.roles.map((r) => r.id)); // termasuk @everyone (ID = guildId)
   data.mentionRoleIds = [...new Set(data.mentionRoleIds)].filter((id) => validRoles.has(id));
 
@@ -259,10 +255,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
     if (xPosts.some((x) => x.tweetId === tweetId)) throw new HttpError(400, `Post #${i + 1} is a duplicate`);
     xPosts.push({ tweetId, like: p.like, retweet: p.retweet, quote: p.quote });
   }
-  // Form Discord maksimal 5 isian: link quote + wallet
-  const formFields = xPosts.filter((p) => p.quote).length + (data.walletType !== "NONE" ? 1 : 0);
-  if (formFields > 5) {
-    throw new HttpError(400, "Too many Quote tasks: Quote posts + wallet can't be more than 5 in total.");
+  // Form Discord maksimal 5 isian: link quote + wallet (untuk yang belum punya wallet tersimpan)
+  if (xPosts.filter((p) => p.quote).length > 4) {
+    throw new HttpError(400, "Maximum 4 Quote tasks per raffle.");
   }
   if ((data.xFollowUsernames.length || xPosts.length) && !xEnabled) {
     throw new HttpError(400, "X tasks are not enabled yet. The admin needs to set X_API_KEY and X_API_SECRET.");
@@ -271,6 +266,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const raffle = await db.raffle.create({
     data: {
       ...data,
+      walletType,
       xFollowUsernames: [...new Set(data.xFollowUsernames)],
       xPosts,
       guildId,

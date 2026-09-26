@@ -7,7 +7,8 @@ import { fetchMember, isDiscordError, rest } from "../discord.js";
 import { connectXUrl, parseQuoteUrl, type TaskClick } from "../x.js";
 import { connectXComponents, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
 import { hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
-import { checkRequirements, normalizeWallet } from "./requirements.js";
+import { checkRequirements } from "./requirements.js";
+import { saveWallet, savedWallet } from "./wallets.js";
 import { scheduleDraw } from "./schedule.js";
 
 const MESSAGE_SYNC_INTERVAL_MS = 15_000;
@@ -93,9 +94,11 @@ async function loadForEntry(raffleId: string, who: Entrant): Promise<Raffle | st
     return ENDED;
   }
   const errors = checkRequirements(raffle, who);
-  if (errors.length) return `❌ You don't meet the requirements yet:\n${errors.map((e) => `• ${e}`).join("\n")}`;
+  if (errors.length) return requirementsReply(errors);
   return raffle;
 }
+
+const requirementsReply = (errors: string[]) => `❌ You don't meet the requirements yet:\n${errors.map((e) => `• ${e}`).join("\n")}`;
 
 const notLinkedReply = (userId: string): Reply => ({
   content: "🔗 This raffle has X tasks. Connect your X account first (one-time only), then click **Enter** again.",
@@ -120,17 +123,23 @@ export type DiscordEntryStep =
   | { kind: "form"; walletType: string; quoteCount: number }
   | { kind: "enter" };
 
-export async function discordEntryStep(raffleId: string, userId: string): Promise<DiscordEntryStep> {
-  const [raffle, xLink, entry] = await Promise.all([
+export async function discordEntryStep(raffleId: string, userId: string, roleIds: string[]): Promise<DiscordEntryStep> {
+  const [raffle, xLink, entry, wallets] = await Promise.all([
     db.raffle.findUnique({ where: { id: raffleId } }),
     db.xLink.findUnique({ where: { discordId: userId } }),
     db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId } } }),
+    db.userWallet.findUnique({ where: { discordId: userId } }),
   ]);
   if (!raffle || raffle.status !== "ACTIVE" || raffle.endsAt.getTime() <= Date.now()) return { kind: "reply", reply: ENDED };
   if (entry) return { kind: "reply", reply: ALREADY_ENTERED };
+  const errors = checkRequirements(raffle, { userId, roleIds });
+  if (errors.length) return { kind: "reply", reply: requirementsReply(errors) };
   if (hasXTasks(raffle) && !xLink) return { kind: "reply", reply: notLinkedReply(userId) };
   const quoteCount = hasXTasks(raffle) ? quotePosts(raffle).length : 0;
-  if (quoteCount || raffle.walletType !== "NONE") return { kind: "form", walletType: raffle.walletType, quoteCount };
+  // Wallet cukup diisi sekali; setelah tersimpan, form hanya muncul untuk link quote
+  const needWallet =
+    (raffle.walletType === "EVM" && !wallets?.evm) || (raffle.walletType === "SOL" && !wallets?.sol);
+  if (quoteCount || needWallet) return { kind: "form", walletType: needWallet ? raffle.walletType : "NONE", quoteCount };
   return { kind: "enter" };
 }
 
@@ -256,10 +265,15 @@ export async function enterRaffle(
     xQuoteUrls = quotes;
   }
 
+  // Wallet tersimpan dipakai langsung; kalau belum ada, wallet dari form disimpan untuk raffle berikutnya
   let wallet: string | null = null;
   if (raffle.walletType !== "NONE") {
-    wallet = normalizeWallet(raffle.walletType, input.wallet ?? "");
-    if (!wallet) return `❌ Invalid ${raffle.walletType === "EVM" ? "EVM" : "Solana"} wallet address.`;
+    wallet = await savedWallet(who.userId, raffle.walletType);
+    if (!wallet) {
+      const saved = await saveWallet(who.userId, raffle.walletType, input.wallet ?? "");
+      if ("error" in saved) return `❌ ${saved.error}`;
+      wallet = saved.wallet;
+    }
   }
 
   try {

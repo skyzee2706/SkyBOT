@@ -4,7 +4,7 @@ import { api, type GuildDetail, type Raffle } from "../api";
 import { ErrorBox, Field, Loading, RolePicker } from "../components";
 import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
 import { ImageInput } from "./ImageInput";
-import { ALLOCATIONS, CHAIN_IDS, CHAINS, chainWallet, CUSTOM_CHAIN_MAX, normalizeChain, type ChainId } from "../../shared/raffle";
+import { ALLOCATIONS, CHAIN_IDS, CHAINS, CUSTOM_CHAIN_MAX, normalizeChain, type ChainId } from "../../shared/raffle";
 import { ArrowLeft } from "lucide-react";
 import { DiscordMarkdown } from "../DiscordMarkdown";
 
@@ -36,7 +36,6 @@ export function CreateRafflePage() {
     requireMember: true, // peserta wajib member server
     inviteUrl: "",
     minAccountAgeDays: 0,
-    walletType: "NONE" as "NONE" | "EVM" | "SOL",
     winnerRoleId: "",
     mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
@@ -48,15 +47,7 @@ export function CreateRafflePage() {
     const key: ErrorKey = k === "gtd" || k === "fcfs" ? "allocations" : k;
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
-  // Jenis wallet mengikuti chain: Solana = wallet Solana, chain lain = EVM. Chain manual boleh keduanya.
   const chainValue = form.chain === OTHER ? normalizeChain(form.customChain) : form.chain;
-  const requiredWallet = chainWallet(chainValue);
-  const setChain = (chain: typeof form.chain) => {
-    set("chain", chain);
-    const w = chain === OTHER ? null : chainWallet(chain);
-    if (w && form.walletType !== "NONE") set("walletType", w);
-  };
-
   const allocationTotal = () => (form.gtd.on ? form.gtd.count : 0) + (form.fcfs.on ? form.fcfs.count : 0);
 
   // Field wajib: kosong = tidak bisa dikirim ke Discord, field-nya ditandai merah.
@@ -173,7 +164,7 @@ export function CreateRafflePage() {
               </select>
             </Field>
             <Field label="Chain" required error={errors.chain}>
-              <select className="input" value={form.chain} onChange={(e) => setChain(e.target.value as typeof form.chain)}>
+              <select className="input" value={form.chain} onChange={(e) => set("chain", e.target.value as typeof form.chain)}>
                 <option value="" disabled>
                   Choose a chain
                 </option>
@@ -296,24 +287,15 @@ export function CreateRafflePage() {
               <div className="input text-zinc-500">Not available for raffles open to non-members</div>
             )}
           </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Minimum Discord account age (days)" hint="0 = no limit. Helps block alt accounts.">
-              <input
-                type="number"
-                min={0}
-                className="input"
-                value={form.minAccountAgeDays}
-                onChange={(e) => set("minAccountAgeDays", Number(e.target.value))}
-              />
-            </Field>
-            <Field label="Wallet submission">
-              <select className="input" value={form.walletType} onChange={(e) => set("walletType", e.target.value as typeof form.walletType)}>
-                <option value="NONE">Not required</option>
-                {requiredWallet !== "SOL" && <option value="EVM">EVM wallet (0x...)</option>}
-                {requiredWallet !== "EVM" && <option value="SOL">Solana wallet</option>}
-              </select>
-            </Field>
-          </div>
+          <Field label="Minimum Discord account age (days)" hint="0 = no limit. Helps block alt accounts.">
+            <input
+              type="number"
+              min={0}
+              className="input sm:max-w-xs"
+              value={form.minAccountAgeDays}
+              onChange={(e) => set("minAccountAgeDays", Number(e.target.value))}
+            />
+          </Field>
           <p className="hint">Role requirements are checked on entry AND re-checked when winners are drawn.</p>
         </section>
 

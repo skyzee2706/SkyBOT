@@ -191,3 +191,12 @@ model GuildSettings {
   // Role yang boleh mengelola raffle di web (mis. @CM), selain Admin / Manage Server
   managerRoleIds String[]
 }
+
+// Wallet peserta (disimpan sekali, dipakai untuk semua raffle). Kunci = ID Discord, jadi peserta dari bot
+// yang belum pernah login web juga punya. 1 wallet hanya bisa terhubung ke 1 akun Discord.
+model UserWallet {
+  discordId String   @id
+  evm       String?  @unique
+  sol       String?  @unique
+  updatedAt DateTime @updatedAt
+}

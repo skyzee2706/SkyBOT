@@ -11,8 +11,9 @@ import { PublicRafflePage } from "./pages/PublicRaffle";
 import { RafflesListPage } from "./pages/RafflesList";
 import { LandingPage } from "./pages/Landing";
 import { MyEntriesPage } from "./pages/MyEntries";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Ticket, Wallet } from "lucide-react";
 import { LogoMark } from "./Logo";
+import { WalletDialog, XLogo, type Profile } from "./Profile";
 
 // Web bisa dibuka tanpa login: daftar raffle & halaman raffle publik.
 // Membuat / mengelola raffle butuh login Discord.
@@ -73,6 +74,17 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  // Wallet & akun X dimuat saat menu akun dibuka
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [walletOpen, setWalletOpen] = useState(false);
+  useEffect(() => {
+    if (!open || !me) return;
+    api<Profile>(`/p/me/profile?r=${encodeURIComponent(pathname)}`)
+      .then(setProfile)
+      .catch(() => {});
+  }, [open, me, pathname]);
+  const hasWallet = !!(profile?.wallets.EVM || profile?.wallets.SOL);
+
   const [loggingOut, setLoggingOut] = useState(false);
   const logout = async () => {
     if (loggingOut) return;
@@ -98,59 +110,87 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
   const avatar = me ? avatarUrl(me) : null;
 
   return (
-    <header className="border-b border-brand-500/20 bg-zinc-950/80 backdrop-blur">
-      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
-        <div className="flex items-center gap-1 sm:gap-4">
-          <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
-            <LogoMark /> <span className="hidden text-brand-50 sm:inline">SkyBOT <span className="text-brand-400">Raffle</span></span>
-          </Link>
-          <NavLink to="/raffles" className={({ isActive }) => nav({ isActive: isActive || pathname.startsWith("/raffle/") })}>
-            Raffles
-          </NavLink>
-          {/* Di layar kecil "My Entries" ada di menu akun */}
-          <NavLink to="/entries" className={(s) => `${nav(s)} hidden sm:inline`}>
-            My Entries
-          </NavLink>
-          <NavLink to="/create" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
-            Create Raffle
-          </NavLink>
-        </div>
-        {me === undefined ? (
-          <div className="h-8 w-20" />
-        ) : me ? (
-          <div ref={menuRef} className="relative">
-            <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-zinc-800">
-              {avatar ? (
-                <img src={avatar} className="h-7 w-7 rounded-full" alt="" />
-              ) : (
-                <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-700 text-xs">{me.username[0]}</div>
-              )}
-              <span className="hidden text-zinc-300 sm:inline">{me.username}</span>
-              <ChevronDown className="h-4 w-4 text-zinc-500" />
-            </button>
-            {open && (
-              <div className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
-                <Link to="/entries" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
-                  My entries
-                </Link>
-                <button
-                  onClick={logout}
-                  disabled={loggingOut}
-                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800 disabled:opacity-60"
-                >
-                  {loggingOut && <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />}
-                  {loggingOut ? "Logging out..." : "Log out"}
-                </button>
-              </div>
-            )}
+    <>
+      <header className="relative z-40 border-b border-brand-500/20 bg-zinc-950/80 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
+          <div className="flex items-center gap-1 sm:gap-4">
+            <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
+              <LogoMark /> <span className="hidden text-brand-50 sm:inline">SkyBOT <span className="text-brand-400">Raffle</span></span>
+            </Link>
+            <NavLink to="/raffles" className={({ isActive }) => nav({ isActive: isActive || pathname.startsWith("/raffle/") })}>
+              Raffles
+            </NavLink>
+            {/* Di layar kecil "My Entries" ada di menu akun */}
+            <NavLink to="/entries" className={(s) => `${nav(s)} hidden sm:inline`}>
+              My Entries
+            </NavLink>
+            <NavLink to="/create" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
+              Create Raffle
+            </NavLink>
           </div>
-        ) : (
-          <a href={loginUrl(pathname)} className="btn btn-primary px-4 py-1.5 text-sm">
-            Log in
-          </a>
-        )}
-      </div>
-    </header>
+          {me === undefined ? (
+            <div className="h-8 w-20" />
+          ) : me ? (
+            <div ref={menuRef} className="relative">
+              <button onClick={() => setOpen((o) => !o)} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-zinc-800">
+                {avatar ? (
+                  <img src={avatar} className="h-7 w-7 rounded-full" alt="" />
+                ) : (
+                  <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-700 text-xs">{me.username[0]}</div>
+                )}
+                <span className="hidden text-zinc-300 sm:inline">{me.username}</span>
+                <ChevronDown className="h-4 w-4 text-zinc-500" />
+              </button>
+              {open && (
+                <div className="absolute right-0 z-30 mt-1 w-56 rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
+                  <Link to="/entries" onClick={() => setOpen(false)} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
+                    <Ticket className="h-4 w-4 text-zinc-400" /> My entries
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setOpen(false);
+                      setWalletOpen(true);
+                    }}
+                    disabled={!profile}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm hover:bg-zinc-800 disabled:opacity-60"
+                  >
+                    <Wallet className="h-4 w-4 text-zinc-400" />
+                    {hasWallet ? "Wallets" : "Connect Wallet"}
+                    {hasWallet && <span className="ml-auto h-2 w-2 rounded-full bg-emerald-400" />}
+                  </button>
+                  {profile?.connectXUrl && (
+                    <a href={profile.connectXUrl} className="flex items-center gap-2 rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
+                      <XLogo className="mx-px h-3.5 w-3.5 text-zinc-400" />
+                      {profile.xUsername ? (
+                        <span className="min-w-0 truncate">
+                          @{profile.xUsername} <span className="text-xs text-zinc-500">· Switch</span>
+                        </span>
+                      ) : (
+                        "Connect X"
+                      )}
+                    </a>
+                  )}
+                  <button
+                    onClick={logout}
+                    disabled={loggingOut}
+                    className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800 disabled:opacity-60"
+                  >
+                    {loggingOut && <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />}
+                    {loggingOut ? "Logging out..." : "Log out"}
+                  </button>
+                </div>
+              )}
+            </div>
+          ) : (
+            <a href={loginUrl(pathname)} className="btn btn-primary px-4 py-1.5 text-sm">
+              Log in
+            </a>
+          )}
+        </div>
+      </header>
+      {/* Di luar header: backdrop-blur di header membuat posisi "fixed" ikut terkunci di dalamnya */}
+      {walletOpen && profile && <WalletDialog profile={profile} onClose={() => setWalletOpen(false)} onSaved={setProfile} />}
+    </>
   );
 }
 

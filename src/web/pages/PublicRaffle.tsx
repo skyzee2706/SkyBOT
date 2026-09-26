@@ -63,6 +63,7 @@ type PublicRaffle = {
     };
     isMember: boolean | null;
     requirementErrors: string[];
+    wallet: string | null; // wallet tersimpan di profil untuk jenis wallet raffle ini
     xUsername: string | null;
     connectXUrl: string | null;
     tasks: { key: string; done: boolean; url: string | null }[];
@@ -253,7 +254,7 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
     setError(null);
     try {
       await api(`/p/raffles/${r.id}/enter`, {
-        body: { wallet: wallet || undefined, quoteUrls: r.quoteCount ? quotes : undefined },
+        body: { wallet: (!viewer?.wallet && wallet) || undefined, quoteUrls: r.quoteCount ? quotes : undefined },
       });
       reload();
     } catch (err) {
@@ -426,7 +427,14 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
           </div>
         ))}
 
-      {r.walletType !== "NONE" && (
+      {r.walletType !== "NONE" && viewer.wallet && (
+        <div>
+          <div className="label">{r.walletType === "EVM" ? "EVM wallet" : "Solana wallet"}</div>
+          <div className="input break-all font-mono text-zinc-400">{viewer.wallet}</div>
+        </div>
+      )}
+
+      {r.walletType !== "NONE" && !viewer.wallet && (
         <div>
           <label className="label">{r.walletType === "EVM" ? "EVM wallet address" : "Solana wallet address"}</label>
           <input
