@@ -4,6 +4,7 @@ import { api, type Entry, type Raffle } from "../api";
 import { ErrorBox, formatDate, Loading, StatusBadge } from "../components";
 import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
 import { ArrowLeft, ExternalLink, Globe, Trophy, Users } from "lucide-react";
+import { DiscordMarkdown } from "../DiscordMarkdown";
 
 // GTD / FCFS = pemenang per allocation (raffle baru); WON = semua pemenang (raffle lama)
 type Filter = "ALL" | Entry["status"] | AllocationType;
@@ -91,7 +92,7 @@ export function RafflePage() {
               Hosted by <span className="font-medium text-zinc-200">{raffle.hostName}</span>
             </div>
           )}
-          {raffle.description && <p className="mb-3 whitespace-pre-wrap text-sm text-zinc-400">{raffle.description}</p>}
+          {raffle.description && <DiscordMarkdown text={raffle.description} className="mb-3" />}
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
             <span>{withAllocations ? `Allocations: ${allocationSummary(raffle)}` : allocationSummary(raffle)}</span>
             {chainLabel(raffle.chain) && <span>Chain: {chainLabel(raffle.chain)}</span>}

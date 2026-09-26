@@ -131,9 +131,6 @@ export function RafflesListPage() {
     <div>
       <div className="mb-6">
         <h1 className="text-2xl font-bold">Find your next allowlist</h1>
-        <p className="text-sm text-zinc-400">
-          Raffles from every community on SkyBOT. Many are open to everyone, no Discord server join needed.
-        </p>
       </div>
 
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -173,10 +170,10 @@ export function RafflesListPage() {
           <Globe className="h-3.5 w-3.5" /> Open to everyone
         </button>
         <button className={pill(alloc === "gtd")} onClick={() => update({ alloc: alloc === "gtd" ? "" : "gtd" })}>
-          Has GTD
+          GTD
         </button>
         <button className={pill(alloc === "fcfs")} onClick={() => update({ alloc: alloc === "fcfs" ? "" : "fcfs" })}>
-          Has FCFS
+          FCFS
         </button>
         <select
           className={`${pill(!!chain)} cursor-pointer bg-zinc-950 outline-none`}

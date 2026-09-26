@@ -6,6 +6,7 @@ import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XT
 import { ImageInput } from "./ImageInput";
 import { ALLOCATIONS, CHAIN_IDS, CHAINS, chainWallet, CUSTOM_CHAIN_MAX, normalizeChain, type ChainId } from "../../shared/raffle";
 import { ArrowLeft } from "lucide-react";
+import { DiscordMarkdown } from "../DiscordMarkdown";
 
 const OTHER = "__other__";
 
@@ -141,7 +142,7 @@ export function CreateRafflePage() {
           <Field label="Title" required error={errors.title}>
             <input className="input" value={form.title} onChange={(e) => set("title", e.target.value)} required maxLength={200} />
           </Field>
-          <Field label="Description" hint="Supports Discord formatting (**bold**, links, etc).">
+          <Field label="Description" hint="Discord formatting: **bold**, *italic*, __underline__, ~~strike~~, # heading, - list, > quote, [link](https://...).">
             <textarea
               className="input min-h-24"
               value={form.description}
@@ -149,6 +150,12 @@ export function CreateRafflePage() {
               maxLength={3000}
             />
           </Field>
+          {form.description.trim() && (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-950/60 p-3">
+              <div className="mb-2 text-xs uppercase tracking-wide text-brand-300/80">Preview</div>
+              <DiscordMarkdown text={form.description} />
+            </div>
+          )}
           <Field label="Image (optional)">
             <ImageInput guildId={guildId!} value={form.imageUrl} onChange={(url) => set("imageUrl", url)} />
           </Field>

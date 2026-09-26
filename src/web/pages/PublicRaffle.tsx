@@ -22,6 +22,7 @@ import {
 import { api, loginUrl, setPageTitle } from "../api";
 import { ErrorBox, formatDate, Loading, roleColor, StatusBadge } from "../components";
 import { timeLeft } from "./RafflesList";
+import { DiscordMarkdown } from "../DiscordMarkdown";
 
 type PublicRaffle = {
   raffle: {
@@ -152,7 +153,7 @@ export function PublicRafflePage() {
               </div>
             )}
             {r.imageUrl && <img src={r.imageUrl} className="mb-4 max-h-96 w-full rounded-xl object-cover" alt="" />}
-            {r.description && <p className="whitespace-pre-wrap text-sm text-zinc-300">{r.description}</p>}
+            {r.description && <DiscordMarkdown text={r.description} />}
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
