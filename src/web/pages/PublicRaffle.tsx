@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import {
+  ArrowLeft,
   Ban,
   CircleCheckBig,
   ExternalLink,
@@ -70,6 +71,7 @@ type PublicRaffle = {
 // Halaman raffle publik: bisa dibuka tanpa login, ikut raffle butuh login Discord.
 export function PublicRafflePage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [data, setData] = useState<PublicRaffle | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
@@ -110,9 +112,19 @@ export function PublicRafflePage() {
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
   const { raffle: r, guild, viewer, canManage } = data;
   const active = r.status === "ACTIVE";
+  // Kembali ke halaman sebelumnya kalau datang dari dalam web; kalau dibuka langsung (mis. dari Discord), ke daftar raffle
+  const cameFromApp = (window.history.state?.idx ?? 0) > 0;
+  const listPath = r.status === "ENDED" ? "/?tab=ended" : "/";
 
   return (
     <>
+      <button
+        type="button"
+        onClick={() => (cameFromApp ? navigate(-1) : navigate(listPath))}
+        className="mb-4 inline-flex items-center gap-1 text-sm text-zinc-400 hover:text-brand-300"
+      >
+        <ArrowLeft className="h-4 w-4" /> Back to raffles
+      </button>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <div className="card">
