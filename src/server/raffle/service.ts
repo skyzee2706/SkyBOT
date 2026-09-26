@@ -1,13 +1,13 @@
 import { randomInt } from "node:crypto";
 import { Routes, type APIMessage } from "discord.js";
 import type { Allocation, Raffle } from "@prisma/client";
-import { hasAllocations } from "../../shared/raffle.js";
+import { chainLabel, hasAllocations } from "../../shared/raffle.js";
 import { db, isUniqueViolation, uniqueTarget } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
 import { connectXUrl, parseQuoteUrl, type TaskClick } from "../x.js";
 import { connectXComponents, raffleButtons, raffleEmbed, xTaskComponents } from "./embed.js";
 import { hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
-import { checkRequirements } from "./requirements.js";
+import { checkRequirements, normalizeWallet } from "./requirements.js";
 import { saveWallet, savedWallet } from "./wallets.js";
 import { scheduleDraw } from "./schedule.js";
 
@@ -120,7 +120,7 @@ export async function connectXReply(userId: string): Promise<Reply> {
 // form = tampilkan form wallet / link quote; enter = langsung ikut; lainnya = balasan (sudah ikut, belum connect X, dst.)
 export type DiscordEntryStep =
   | { kind: "reply"; reply: Reply }
-  | { kind: "form"; walletType: string; quoteCount: number }
+  | { kind: "form"; walletType: string; quoteCount: number; chain?: string }
   | { kind: "enter" };
 
 export async function discordEntryStep(raffleId: string, userId: string, roleIds: string[]): Promise<DiscordEntryStep> {
@@ -138,8 +138,12 @@ export async function discordEntryStep(raffleId: string, userId: string, roleIds
   const quoteCount = hasXTasks(raffle) ? quotePosts(raffle).length : 0;
   // Wallet cukup diisi sekali; setelah tersimpan, form hanya muncul untuk link quote
   const needWallet =
-    (raffle.walletType === "EVM" && !wallets?.evm) || (raffle.walletType === "SOL" && !wallets?.sol);
-  if (quoteCount || needWallet) return { kind: "form", walletType: needWallet ? raffle.walletType : "NONE", quoteCount };
+    raffle.walletType === "CUSTOM" ||
+    (raffle.walletType === "EVM" && !wallets?.evm) ||
+    (raffle.walletType === "SOL" && !wallets?.sol);
+  if (quoteCount || needWallet) {
+    return { kind: "form", walletType: needWallet ? raffle.walletType : "NONE", quoteCount, chain: chainLabel(raffle.chain) ?? undefined };
+  }
   return { kind: "enter" };
 }
 
@@ -267,7 +271,11 @@ export async function enterRaffle(
 
   // Wallet tersimpan dipakai langsung; kalau belum ada, wallet dari form disimpan untuk raffle berikutnya
   let wallet: string | null = null;
-  if (raffle.walletType !== "NONE") {
+  if (raffle.walletType === "CUSTOM") {
+    // Chain manual: wallet diisi tiap raffle dan tidak disimpan ke profil
+    wallet = normalizeWallet("CUSTOM", input.wallet ?? "");
+    if (!wallet) return `❌ Invalid ${chainLabel(raffle.chain) ?? ""} wallet address.`.replace("  ", " ");
+  } else if (raffle.walletType !== "NONE") {
     wallet = await savedWallet(who.userId, raffle.walletType);
     if (!wallet) {
       const saved = await saveWallet(who.userId, raffle.walletType, input.wallet ?? "");

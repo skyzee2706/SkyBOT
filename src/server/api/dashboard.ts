@@ -241,8 +241,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const winnerCount = data.gtdCount + data.fcfsCount;
   if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
   if (winnerCount > 1000) throw new HttpError(400, "Maximum 1000 allocations in total");
-  // Wallet selalu diminta, jenisnya mengikuti chain (Solana = wallet Solana, chain lain / manual = EVM)
-  const walletType = chainWallet(chain) ?? "EVM";
+  // Wallet selalu diminta, jenisnya mengikuti chain (Solana = wallet Solana, chain di daftar = EVM,
+  // chain manual = wallet chain itu, diisi manual tiap raffle)
+  const walletType = chainWallet(chain) ?? "CUSTOM";
   const validRoles = new Set(ctx.roles.map((r) => r.id)); // termasuk @everyone (ID = guildId)
   data.mentionRoleIds = [...new Set(data.mentionRoleIds)].filter((id) => validRoles.has(id));
 

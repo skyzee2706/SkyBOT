@@ -51,6 +51,7 @@ enum WalletType {
   NONE
   EVM
   SOL
+  CUSTOM // chain yang diketik manual (Zcash, Sui, ...): wallet diisi manual tiap raffle, tidak disimpan
 }
 
 model Raffle {

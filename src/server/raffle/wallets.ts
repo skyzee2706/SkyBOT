@@ -2,12 +2,12 @@ import type { WalletType } from "@prisma/client";
 import { db, isUniqueViolation } from "../db.js";
 import { normalizeWallet } from "./requirements.js";
 
-export type WalletKind = Exclude<WalletType, "NONE">;
+export type WalletKind = "EVM" | "SOL"; // hanya wallet ini yang disimpan di profil
 const field = (type: WalletKind) => (type === "EVM" ? "evm" : "sol");
 
 // Wallet tersimpan milik user untuk jenis ini (null = belum pernah diisi)
 export async function savedWallet(discordId: string, type: WalletType): Promise<string | null> {
-  if (type === "NONE") return null;
+  if (type !== "EVM" && type !== "SOL") return null; // chain manual: selalu diisi di form
   const w = await db.userWallet.findUnique({ where: { discordId } });
   return w?.[field(type)] ?? null;
 }

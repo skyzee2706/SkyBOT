@@ -39,10 +39,13 @@ export function checkRequirements(raffle: RequirementInput, ctx: CheckContext): 
 
 const EVM_RE = /^0x[a-fA-F0-9]{40}$/;
 const SOL_RE = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const CUSTOM_RE = /^[\x21-\x7e]{8,255}$/;
 
 export function normalizeWallet(type: WalletType, raw: string): string | null {
   const v = raw.trim();
   if (type === "EVM") return EVM_RE.test(v) ? v.toLowerCase() : null;
   if (type === "SOL") return SOL_RE.test(v) ? v : null;
+  // Chain manual: formatnya beda-beda (Zcash, Sui, Aptos...), cukup dicek panjang & tanpa spasi
+  if (type === "CUSTOM") return CUSTOM_RE.test(v) ? v : null;
   return null;
 }

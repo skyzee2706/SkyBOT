@@ -62,7 +62,7 @@ re-verified against Discord, and the results are announced in the channel, split
 - **Server membership**, configurable per raffle (members only, or open to everyone on the web)
 - **Required roles** (entrants need at least one)
 - **Minimum Discord account age** to discourage alt accounts
-- **Wallet** (EVM or Solana, matched to the chain), saved once per account and reused for every raffle
+- **Wallet** matched to the chain: EVM or Solana wallets are saved once per account and reused for every raffle; custom chains (e.g. Zcash, Sui, Aptos) ask for that chain's wallet on each entry
 - **X (Twitter) tasks**: follow, like, retweet and quote, with tracked task links
 
 </td>

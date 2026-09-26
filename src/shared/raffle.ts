@@ -57,3 +57,7 @@ export const discordAvatarUrl = (userId: string, hash: string | null | undefined
   hash
     ? `https://cdn.discordapp.com/avatars/${userId}/${hash}.png?size=${size}`
     : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userId) >> 22n) % 6n)}.png`;
+
+// Nama wallet yang diminta: "EVM (0x...)", "Solana", atau nama chain manual (mis. "Zcash")
+export const walletName = (r: { walletType: string; chain: string | null }) =>
+  r.walletType === "EVM" ? "EVM (0x...)" : r.walletType === "SOL" ? "Solana" : (chainLabel(r.chain) ?? "custom");

@@ -95,7 +95,7 @@ const textInput = (customId: string, label: string, placeholder: string, min: nu
 
 // Form yang muncul di Discord: link quote dan/atau wallet.
 // Discord membatasi 5 input per form; dashboard memastikan jumlah quote + wallet ≤ 5.
-function entryModal(raffleId: string, walletType: string, quoteCount: number) {
+function entryModal(raffleId: string, walletType: string, quoteCount: number, chain?: string) {
   const components = [];
   for (let n = 1; n <= quoteCount; n++) {
     const label = quoteCount > 1 ? `Link to your quote of post #${n}` : "Link to your quote post";
@@ -105,7 +105,15 @@ function entryModal(raffleId: string, walletType: string, quoteCount: number) {
     components.push(
       walletType === "EVM"
         ? textInput("wallet", "EVM wallet address", "0x...", 42, 42)
-        : textInput("wallet", "Solana wallet address", "Your Solana address", 32, 44),
+        : walletType === "SOL"
+          ? textInput("wallet", "Solana wallet address", "Your Solana address", 32, 44)
+          : textInput(
+              "wallet",
+              chain ? (chain.length <= 30 ? `${chain} wallet address` : `${chain.slice(0, 38)} wallet`) : "Wallet address",
+              chain ? `Your ${chain.slice(0, 40)} address` : "Your wallet address",
+              8,
+              255,
+            ),
     );
   }
   return {
@@ -131,7 +139,10 @@ const continueReply = (raffleId: string, step: Extract<DiscordEntryStep, { kind:
           type: ComponentType.Button,
           style: ButtonStyle.Primary,
           label: "Continue",
-          custom_id: `raffle:confirm:${raffleId}:${step.walletType}:${step.quoteCount ? `Q${step.quoteCount}` : "-"}`,
+          // Nama chain manual ikut di akhir (untuk label form tanpa query database)
+          custom_id: `raffle:confirm:${raffleId}:${step.walletType}:${step.quoteCount ? `Q${step.quoteCount}` : "-"}${
+            step.walletType === "CUSTOM" && step.chain ? `:${step.chain}` : ""
+          }`.slice(0, 100),
         },
       ],
     },
@@ -166,7 +177,8 @@ interactionsRouter.post("/", async (req, res) => {
     return;
   }
   const gi = i as GuildInteraction;
-  const [, action, raffleId, walletType = "NONE", flag] = gi.data.custom_id.split(":");
+  const [, action, raffleId, walletType = "NONE", flag, ...rest] = gi.data.custom_id.split(":");
+  const chainName = rest.join(":") || undefined; // nama chain manual (tombol Continue)
   const isButton = i.type === InteractionType.MessageComponent;
   const needsWallet = walletType !== "NONE";
   // "Q3" = 3 link quote; "Q" (tombol versi lama) = 1
@@ -174,7 +186,7 @@ interactionsRouter.post("/", async (req, res) => {
 
   // Form (modal) harus jadi respons pertama (maks 3 detik).
   if (isButton && action === "confirm" && (needsWallet || quoteCount)) {
-    res.json(entryModal(raffleId, walletType, quoteCount));
+    res.json(entryModal(raffleId, walletType, quoteCount, chainName));
     return;
   }
 
@@ -188,7 +200,7 @@ interactionsRouter.post("/", async (req, res) => {
       2000,
     );
     if (step?.kind === "form") {
-      res.json(entryModal(raffleId, step.walletType, step.quoteCount));
+      res.json(entryModal(raffleId, step.walletType, step.quoteCount, step.chain));
       return;
     }
     if (step?.kind === "reply") {

@@ -38,7 +38,7 @@ type PublicRaffle = {
     chain: string | null;
     allocations: string;
     spots: number;
-    walletType: "NONE" | "EVM" | "SOL";
+    walletType: "NONE" | "EVM" | "SOL" | "CUSTOM";
     minAccountAgeDays: number;
     requireAnyRole: boolean;
     requireMember: boolean;
@@ -207,7 +207,9 @@ export function PublicRafflePage() {
             )}
             {r.minAccountAgeDays > 0 && <div>Discord account at least {r.minAccountAgeDays} days old</div>}
             {r.hasXTasks && <div>Connect your X account and complete the X tasks</div>}
-            {r.walletType !== "NONE" && <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : "a Solana"} wallet</div>}
+            {r.walletType !== "NONE" && (
+              <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : r.walletType === "SOL" ? "a Solana" : `your ${r.chain}`} wallet</div>
+            )}
             {r.discordUrl && (
               <a href={r.discordUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 pt-2 text-brand-400 hover:underline">
                 View in Discord <ExternalLink className="h-3.5 w-3.5" />
@@ -429,17 +431,17 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
 
       {r.walletType !== "NONE" && viewer.wallet && (
         <div>
-          <div className="label">{r.walletType === "EVM" ? "EVM wallet" : "Solana wallet"}</div>
+          <div className="label">{r.walletType === "EVM" ? "EVM wallet" : `${r.chain} wallet`}</div>
           <div className="input break-all font-mono text-zinc-400">{viewer.wallet}</div>
         </div>
       )}
 
       {r.walletType !== "NONE" && !viewer.wallet && (
         <div>
-          <label className="label">{r.walletType === "EVM" ? "EVM wallet address" : "Solana wallet address"}</label>
+          <label className="label">{r.walletType === "EVM" ? "EVM wallet address" : `${r.walletType === "SOL" ? "Solana" : r.chain} wallet address`}</label>
           <input
             className="input font-mono"
-            placeholder={r.walletType === "EVM" ? "0x..." : "Your Solana address"}
+            placeholder={r.walletType === "EVM" ? "0x..." : `Your ${r.walletType === "SOL" ? "Solana" : r.chain} address`}
             value={wallet}
             onChange={(e) => setWallet(e.target.value.trim())}
             required

@@ -1,6 +1,6 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import type { Raffle } from "@prisma/client";
-import { ALLOCATIONS, allocationCount, chainLabel, hasAllocations, publicRafflePath } from "../../shared/raffle.js";
+import { ALLOCATIONS, allocationCount, chainLabel, hasAllocations, publicRafflePath, walletName } from "../../shared/raffle.js";
 import { env } from "../env.js";
 import { taskClickUrl, tweetUrl } from "../x.js";
 import { getXPosts, hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
@@ -43,7 +43,7 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
   if (!raffle.requireMember) reqs.push("🌐 Open to non-members (enter on the web page)");
   if (raffle.minAccountAgeDays) reqs.push(`Discord account age ≥ ${raffle.minAccountAgeDays} days`);
   if (hasXTasks(raffle)) reqs.push("Connect your X account", ...xTaskLines(raffle));
-  if (raffle.walletType !== "NONE") reqs.push(`Submit ${raffle.walletType === "EVM" ? "EVM (0x...)" : "Solana"} wallet`); // selalu paling bawah
+  if (raffle.walletType !== "NONE") reqs.push(`Submit ${walletName(raffle)} wallet`); // selalu paling bawah
 
   const embed = new EmbedBuilder()
     .setTitle(`🎉 ${raffle.title}`.slice(0, 256))

@@ -106,7 +106,7 @@ export function RafflePage() {
             <span>
               {raffle.status === "ACTIVE" ? "Ends" : "Ended"} {formatDate(raffle.endedAt ?? raffle.endsAt)}
             </span>
-            {raffle.walletType !== "NONE" && <span>{raffle.walletType} wallet</span>}
+            {raffle.walletType !== "NONE" && <span>{raffle.walletType === "CUSTOM" ? chainLabel(raffle.chain) : raffle.walletType} wallet</span>}
           </div>
           {hasX && (
             <div className="mt-3 space-y-1 text-sm text-zinc-400">
