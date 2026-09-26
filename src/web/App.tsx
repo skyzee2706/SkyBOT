@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link, NavLink, Navigate, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
+import { Link, NavLink, Navigate, Route, Routes, useLocation, useParams } from "react-router-dom";
 import { api, avatarUrl, loginUrl, type Me } from "./api";
 import { GuildsPage } from "./pages/Guilds";
 import { GuildPage } from "./pages/Guild";
@@ -63,7 +63,6 @@ export function App() {
 
 function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => void }) {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -74,12 +73,24 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
     return () => document.removeEventListener("mousedown", close);
   }, [open]);
 
+  const [loggingOut, setLoggingOut] = useState(false);
   const logout = async () => {
-    await api("/auth/logout", { method: "POST" });
-    setOpen(false);
+    if (loggingOut) return;
+    setLoggingOut(true);
+    // Coba sampai 2x (server/database kadang lambat saat baru bangun)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        await api("/auth/logout", { method: "POST" });
+        break;
+      } catch (e) {
+        console.error("[logout] failed", e);
+      }
+    }
     onLogout();
-    // Halaman kelola butuh login; kembali ke daftar raffle
-    if (!pathname.startsWith("/raffle") && pathname !== "/") navigate("/");
+    // Muat ulang penuh supaya semua data halaman (status ikut raffle, dll.) ikut ter-reset.
+    // Halaman publik tetap di tempat; halaman yang butuh login kembali ke beranda.
+    const isPublic = pathname === "/" || pathname === "/raffles" || pathname.startsWith("/raffle/");
+    window.location.assign(isPublic ? window.location.pathname + window.location.search : "/");
   };
 
   const nav = ({ isActive }: { isActive: boolean }) =>
@@ -122,11 +133,13 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
                 <Link to="/entries" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
                   My entries
                 </Link>
-                <Link to="/create" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
-                  My servers
-                </Link>
-                <button onClick={logout} className="block w-full rounded-md px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800">
-                  Log out
+                <button
+                  onClick={logout}
+                  disabled={loggingOut}
+                  className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800 disabled:opacity-60"
+                >
+                  {loggingOut && <span className="h-3 w-3 animate-spin rounded-full border-2 border-red-400 border-t-transparent" />}
+                  {loggingOut ? "Logging out..." : "Log out"}
                 </button>
               </div>
             )}

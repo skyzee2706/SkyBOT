@@ -86,13 +86,16 @@ authRouter.get("/callback", async (req, res) => {
   res.redirect(next ?? "/");
 });
 
+// Logout selalu berhasil di sisi browser: cookie dihapus lebih dulu, lalu sesi di database.
+// Kalau database sedang lambat/error (mis. Neon baru bangun), user tetap ter-logout dan sesi
+// yang tertinggal akan kedaluwarsa sendiri.
 authRouter.post("/logout", async (req, res) => {
   const sid = req.cookies.sid as string | undefined;
+  res.clearCookie("sid", { httpOnly: true, sameSite: "lax", secure, path: "/" });
   if (sid) {
     sessionCache.delete(sid);
-    await db.session.deleteMany({ where: { id: sid } });
+    await db.session.deleteMany({ where: { id: sid } }).catch((e) => console.error("[auth] failed to delete session", e));
   }
-  res.clearCookie("sid");
   res.json({ ok: true });
 });
 
