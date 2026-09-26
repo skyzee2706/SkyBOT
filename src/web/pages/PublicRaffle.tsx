@@ -160,17 +160,7 @@ export function PublicRafflePage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Info label="Allocations" value={r.allocations} />
             <Info label="Chain" value={r.chain ?? "—"} />
-            <Info
-              label="Entries"
-              value={String(r.entryCount)}
-              sub={
-                active && r.spots > 0
-                  ? r.entryCount <= r.spots
-                    ? "Every entry wins so far"
-                    : `~1 in ${(r.entryCount / r.spots).toFixed(r.entryCount / r.spots < 10 ? 1 : 0)} odds`
-                  : undefined
-              }
-            />
+            <Info label="Entries" value={String(r.entryCount)} />
             <Info
               label={active ? "Ends in" : "Ended"}
               value={active ? timeLeft(r.endsAt, now) : formatDate(r.endedAt ?? r.endsAt)}

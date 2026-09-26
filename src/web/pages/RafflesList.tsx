@@ -211,13 +211,6 @@ export function RafflesListPage() {
   );
 }
 
-// Perkiraan peluang: jumlah peserta per 1 spot
-const oddsLabel = (spots: number, entries: number) => {
-  if (entries <= spots) return "every entry wins so far";
-  const ratio = entries / spots;
-  return `~1 in ${ratio < 10 ? ratio.toFixed(1) : Math.round(ratio)}`;
-};
-
 // Tanggal ringkas untuk kartu (muat di layar HP): "Sep 26"
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
@@ -267,7 +260,6 @@ export function RaffleCard({ r, now, footer }: { r: RaffleCardData; now: number;
           </span>
           <span className="truncate">
             {r.entryCount} entr{r.entryCount === 1 ? "y" : "ies"}
-            {live && r.spots > 0 && <span className="text-zinc-500"> · {oddsLabel(r.spots, r.entryCount)}</span>}
           </span>
         </div>
         {footer}
