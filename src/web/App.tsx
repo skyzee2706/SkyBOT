@@ -38,7 +38,7 @@ export function App() {
   return (
     <div className="flex min-h-screen flex-col">
       <Header me={me} onLogout={() => setMe(null)} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-8">
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/raffles" element={<RafflesListPage />} />
@@ -88,7 +88,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
 
   return (
     <header className="border-b border-brand-500/20 bg-zinc-950/80 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
+      <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-1 sm:gap-4">
           <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
             <LogoMark /> <span className="hidden text-brand-50 sm:inline">SkyBOT <span className="text-brand-400">Raffle</span></span>

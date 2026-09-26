@@ -110,7 +110,7 @@ export function DonateButton({ className = "" }: { className?: string }) {
 export function Footer() {
   return (
     <footer className="border-t border-brand-500/15">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-5">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-5">
         <CreatorCredit />
         <DonateButton />
       </div>

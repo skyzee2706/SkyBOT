@@ -54,7 +54,7 @@ async function loadRaffle(req: Request) {
 
 export const publicRouter = Router();
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 12; // 4 kolom × 3 baris (desktop), 2 kolom × 6 baris (HP)
 
 // Angka ringkas untuk landing page (tanpa data pribadi), di-cache 1 menit
 let statsCache: { at: number; data: unknown } | null = null;
@@ -171,8 +171,8 @@ async function toCards(raffles: (Raffle & { _count: { entries: number } })[]) {
 publicRouter.get("/me/entries", async (req, res) => {
   const user = await currentUser(req);
   if (!user) throw new HttpError(401, "Log in with Discord to see your entries.");
-  // Per halaman 10 raffle; ?page= mulai dari 1
-  const size = 10;
+  // Per halaman 12 raffle (sama dengan daftar raffle); ?page= mulai dari 1
+  const size = PAGE_SIZE;
   const page = Math.max(1, Math.min(10_000, Number(req.query.page) || 1));
   const mine = { userId: user.id };
   const [entries, total, won, live] = await Promise.all([

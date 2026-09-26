@@ -17,7 +17,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api } from "../api";
-import { RaffleCard, type RaffleCardData } from "./RafflesList";
+import { RAFFLE_GRID, RaffleCard, type RaffleCardData } from "./RafflesList";
 
 type Stats = { raffles: number; live: number; entries: number; winners: number; communities: number };
 
@@ -100,7 +100,7 @@ export function LandingPage() {
   useEffect(() => {
     api<Stats>("/p/stats").then(setStats).catch(() => {});
     api<{ raffles: RaffleCardData[] }>("/p/raffles?page=1")
-      .then((d) => setLive(d.raffles.slice(0, 3)))
+      .then((d) => setLive(d.raffles.slice(0, 4)))
       .catch(() => {});
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
@@ -177,7 +177,7 @@ export function LandingPage() {
               View all <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <div className={RAFFLE_GRID}>
             {live.map((r) => (
               <RaffleCard key={r.id} r={r} now={now} />
             ))}

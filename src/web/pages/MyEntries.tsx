@@ -3,7 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { CircleCheckBig, Clock, Ticket, Trophy, XCircle } from "lucide-react";
 import { api, setPageTitle } from "../api";
 import { ErrorBox, Loading, Pagination } from "../components";
-import { RaffleCard, type RaffleCardData } from "./RafflesList";
+import { RAFFLE_GRID, RaffleCard, type RaffleCardData } from "./RafflesList";
 
 type MyEntry = {
   enteredAt: string;
@@ -21,12 +21,13 @@ function result(e: MyEntry, now: number) {
   if (r.status === "CANCELLED") return { icon: XCircle, text: "Raffle cancelled", cls: "bg-zinc-800 text-zinc-400 ring-zinc-700" };
   if (r.status === "ENDED" || new Date(r.endsAt).getTime() <= now)
     return { icon: XCircle, text: r.status === "ENDED" ? "Not selected" : "Drawing winners...", cls: "bg-zinc-800 text-zinc-400 ring-zinc-700" };
-  return { icon: Clock, text: "Entered, waiting for the draw", cls: "bg-brand-500/15 text-brand-200 ring-brand-500/30" };
+  return { icon: Clock, text: "Waiting for the draw", cls: "bg-brand-500/15 text-brand-200 ring-brand-500/30" };
 }
 
 type Page = {
   total: number;
   page: number;
+  pageSize: number;
   totalPages: number;
   summary: { entered: number; live: number; won: number };
   entries: MyEntry[];
@@ -101,10 +102,10 @@ export function MyEntriesPage() {
 
       {data && data.total > 0 && (
         <p className="mb-3 text-xs text-zinc-500">
-          Showing {(data.page - 1) * 10 + 1}–{Math.min(data.page * 10, data.total)} of {data.total}
+          Showing {(data.page - 1) * data.pageSize + 1}–{Math.min(data.page * data.pageSize, data.total)} of {data.total}
         </p>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={RAFFLE_GRID}>
         {items?.map((e) => {
           const res = result(e, now);
           const Icon = res.icon;
@@ -114,8 +115,8 @@ export function MyEntriesPage() {
               r={e.raffle}
               now={now}
               footer={
-                <div className={`mt-1 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium ring-1 ${res.cls}`}>
-                  <Icon className="h-3.5 w-3.5" /> {res.text}
+                <div className={`mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[11px] font-medium ring-1 sm:px-2.5 sm:text-xs ${res.cls}`}>
+                  <Icon className="h-3.5 w-3.5 shrink-0" /> <span className="line-clamp-2">{res.text}</span>
                 </div>
               }
             />

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Globe, Search, SlidersHorizontal, Ticket, Users, X } from "lucide-react";
 import { api, setPageTitle } from "../api";
-import { ErrorBox, formatDate, Loading, Pagination } from "../components";
+import { ErrorBox, Loading, Pagination } from "../components";
 import { CHAIN_IDS, CHAINS } from "../../shared/raffle";
 
 export type RaffleCardData = {
@@ -21,7 +21,7 @@ export type RaffleCardData = {
   entryCount: number;
   guild: { name: string | null; icon: string | null };
 };
-type ListResponse = { total: number; page: number; totalPages: number; raffles: RaffleCardData[] };
+type ListResponse = { total: number; page: number; pageSize: number; totalPages: number; raffles: RaffleCardData[] };
 
 export function timeLeft(iso: string, now: number) {
   const s = Math.max(0, Math.floor((new Date(iso).getTime() - now) / 1000));
@@ -197,12 +197,12 @@ export function RafflesListPage() {
       )}
       {data && data.total > 0 && (
         <p className="mb-3 text-xs text-zinc-500">
-          Showing {(data.page - 1) * 10 + 1}–{Math.min(data.page * 10, data.total)} of {data.total} live raffle
+          Showing {(data.page - 1) * data.pageSize + 1}–{Math.min(data.page * data.pageSize, data.total)} of {data.total} live raffle
           {data.total === 1 ? "" : "s"}
         </p>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={RAFFLE_GRID}>
         {items?.map((r) => <RaffleCard key={r.id} r={r} now={now} />)}
       </div>
 
@@ -218,21 +218,28 @@ const oddsLabel = (spots: number, entries: number) => {
   return `~1 in ${ratio < 10 ? ratio.toFixed(1) : Math.round(ratio)}`;
 };
 
-// Kartu raffle (dipakai di daftar raffle, landing page & My entries)
+// Tanggal ringkas untuk kartu (muat di layar HP): "Sep 26"
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+
+// Grid kartu raffle: 2 per baris di HP, 4 per baris di desktop (12 per halaman = 6 × 2 / 3 × 4)
+export const RAFFLE_GRID = "grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4";
+
+// Kartu raffle (dipakai di daftar raffle, landing page & My entries). Dibuat ringkas supaya muat 2 kolom di HP.
 export function RaffleCard({ r, now, footer }: { r: RaffleCardData; now: number; footer?: ReactNode }) {
   const live = r.status === "ACTIVE" && new Date(r.endsAt).getTime() > now;
+  const chip = "truncate rounded-full bg-brand-500/10 px-1.5 py-0.5 text-brand-200 ring-1 ring-brand-500/20 sm:px-2";
   return (
-    <Link to={`/raffle/${r.id}`} className="card group flex flex-col gap-3 p-0 transition hover:border-brand-500/50">
+    <Link to={`/raffle/${r.id}`} className="card group flex min-w-0 flex-col gap-2 p-0 transition hover:border-brand-500/50 sm:gap-3">
       <div className="relative">
         {r.imageUrl ? (
-          <img src={r.imageUrl} className="h-40 w-full rounded-t-2xl object-cover" alt="" />
+          <img src={r.imageUrl} className="aspect-[4/3] w-full rounded-t-2xl object-cover" alt="" loading="lazy" />
         ) : (
-          <div className="grid h-40 w-full place-items-center rounded-t-2xl bg-gradient-to-br from-brand-900/60 to-zinc-900">
-            <Ticket className="h-12 w-12 text-brand-300/70" strokeWidth={1.5} />
+          <div className="grid aspect-[4/3] w-full place-items-center rounded-t-2xl bg-gradient-to-br from-brand-900/60 to-zinc-900">
+            <Ticket className="h-10 w-10 text-brand-300/70 sm:h-12 sm:w-12" strokeWidth={1.5} />
           </div>
         )}
         <span
-          className={`absolute left-3 top-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium backdrop-blur ${
+          className={`absolute left-2 top-2 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-medium backdrop-blur sm:left-3 sm:top-3 sm:px-2 sm:text-xs ${
             r.requireMember ? "bg-zinc-950/75 text-zinc-300" : "bg-emerald-950/70 text-emerald-200 ring-1 ring-emerald-400/30"
           }`}
         >
@@ -240,23 +247,27 @@ export function RaffleCard({ r, now, footer }: { r: RaffleCardData; now: number;
           {r.requireMember ? "Members only" : "Open to all"}
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-2 px-4 pb-4">
-        <div className="flex items-center gap-2 text-xs text-zinc-400">
-          {r.guild.icon ? <img src={r.guild.icon} className="h-4 w-4 rounded-full" alt="" /> : <div className="h-4 w-4 rounded-full bg-zinc-700" />}
+      <div className="flex min-w-0 flex-1 flex-col gap-1.5 px-3 pb-3 sm:gap-2 sm:px-4 sm:pb-4">
+        <div className="flex min-w-0 items-center gap-1.5 text-[11px] text-zinc-400 sm:text-xs">
+          {r.guild.icon ? (
+            <img src={r.guild.icon} className="h-4 w-4 shrink-0 rounded-full" alt="" />
+          ) : (
+            <div className="h-4 w-4 shrink-0 rounded-full bg-zinc-700" />
+          )}
           <span className="truncate">{r.guild.name ?? "Discord server"}</span>
         </div>
-        <div className="line-clamp-2 font-semibold text-brand-50">{r.title}</div>
-        <div className="flex flex-wrap gap-1.5 text-xs">
-          <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-brand-200 ring-1 ring-brand-500/20">{r.allocations}</span>
-          {r.chain && <span className="rounded-full bg-brand-500/10 px-2 py-0.5 text-brand-200 ring-1 ring-brand-500/20">{r.chain}</span>}
+        <div className="line-clamp-2 text-sm font-semibold leading-snug text-brand-50 sm:text-base">{r.title}</div>
+        <div className="flex min-w-0 flex-wrap gap-1 text-[11px] sm:gap-1.5 sm:text-xs">
+          <span className={chip}>{r.allocations}</span>
+          {r.chain && <span className={chip}>{r.chain}</span>}
         </div>
-        <div className="mt-auto flex items-center justify-between gap-2 pt-1 text-xs text-zinc-400">
+        <div className="mt-auto flex flex-col gap-0.5 pt-1 text-[11px] text-zinc-400 sm:text-xs">
+          <span className={live ? "font-medium text-emerald-400" : "text-red-300/80"}>
+            {live ? `Ends in ${timeLeft(r.endsAt, now)}` : `Ended ${shortDate(r.endedAt ?? r.endsAt)}`}
+          </span>
           <span className="truncate">
             {r.entryCount} entr{r.entryCount === 1 ? "y" : "ies"}
             {live && r.spots > 0 && <span className="text-zinc-500"> · {oddsLabel(r.spots, r.entryCount)}</span>}
-          </span>
-          <span className={`shrink-0 ${live ? "font-medium text-emerald-400" : "text-red-300/80"}`}>
-            {live ? `Ends in ${timeLeft(r.endsAt, now)}` : `Ended ${formatDate(r.endedAt ?? r.endsAt)}`}
           </span>
         </div>
         {footer}
