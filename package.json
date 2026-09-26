@@ -1,6 +1,10 @@
 {
-  "name": "raffle-bot",
-  "version": "0.1.0",
+  "name": "skybot-raffle",
+  "version": "1.0.0",
+  "description": "Discord raffle bot with a web dashboard: GTD/FCFS allocations, role and wallet requirements, and X tasks.",
+  "author": "Skyzee (https://x.com/SkyzeeReal)",
+  "license": "UNLICENSED",
+  "homepage": "https://skybot-raffle.vercel.app",
   "private": true,
   "type": "module",
   "scripts": {
