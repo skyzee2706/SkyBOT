@@ -1,3 +1,4 @@
+import { ExternalLink, X } from "lucide-react";
 const MAX_FOLLOWS = 5;
 const MAX_POSTS = 5;
 
@@ -28,9 +29,9 @@ function TaskPreview({ value }: { value: XTasksValue }) {
   const posts = value.posts.map((p) => ({ ...p, id: tweetIdFrom(p.url) })).filter((p) => p.id);
   posts.forEach((p, i) => {
     const n = posts.length > 1 ? ` #${i + 1}` : "";
-    if (p.like) tasks.push({ label: `❤️ Like${n}`, url: intent.like(p.id!) });
-    if (p.retweet) tasks.push({ label: `🔁 Retweet${n}`, url: intent.retweet(p.id!) });
-    if (p.quote) tasks.push({ label: `💬 Quote${n}`, url: intent.quote(p.id!) });
+    if (p.like) tasks.push({ label: `Like${n}`, url: intent.like(p.id!) });
+    if (p.retweet) tasks.push({ label: `Retweet${n}`, url: intent.retweet(p.id!) });
+    if (p.quote) tasks.push({ label: `Quote${n}`, url: intent.quote(p.id!) });
   });
   if (tasks.length === 0) return null;
   return (
@@ -39,7 +40,7 @@ function TaskPreview({ value }: { value: XTasksValue }) {
       <div className="flex flex-wrap gap-2">
         {tasks.map((t) => (
           <a key={t.label} href={t.url} target="_blank" rel="noreferrer" className="btn btn-ghost px-3 py-1.5 text-xs">
-            {t.label} ↗
+            {t.label} <ExternalLink className="h-3.5 w-3.5" />
           </a>
         ))}
       </div>
@@ -68,7 +69,7 @@ export function XTasksEditor({ value, onChange }: { value: XTasksValue; onChange
             <div key={i} className="flex gap-2">
               <input className="input" value={f} onChange={(e) => setFollow(i, e.target.value)} placeholder="@username or profile link" />
               <button type="button" className="btn btn-ghost px-3" onClick={() => removeFollow(i)} aria-label="Remove account">
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
           ))}

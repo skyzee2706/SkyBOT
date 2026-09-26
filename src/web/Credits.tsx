@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
+import { Check, Copy, Heart } from "lucide-react";
 
 export const CREATOR = {
   handle: "SkyzeeReal",
@@ -55,7 +56,7 @@ export function DonateModal({ onClose }: { onClose: () => void }) {
       >
         <img src={CREATOR.avatar} alt="" className="mx-auto mb-3 h-16 w-16 rounded-full ring-2 ring-indigo-500/60" />
         <h2 id="donate-title" className="text-lg font-semibold">
-          Support development 💜
+          Support development
         </h2>
         <p className="mb-4 mt-1 text-sm text-zinc-400">
           Enjoying SkyBOT Raffle? Donations help keep it free and growing. Thank you!
@@ -73,7 +74,15 @@ export function DonateModal({ onClose }: { onClose: () => void }) {
 
         <div className="flex gap-2">
           <button className="btn btn-primary flex-1" onClick={copy}>
-            {copied ? "✅ Copied!" : "Copy address"}
+            {copied ? (
+              <>
+                <Check className="h-4 w-4" /> Copied!
+              </>
+            ) : (
+              <>
+                <Copy className="h-4 w-4" /> Copy address
+              </>
+            )}
           </button>
           <button className="btn btn-ghost" onClick={onClose}>
             Close
@@ -91,7 +100,7 @@ export function DonateButton({ className = "" }: { className?: string }) {
   return (
     <>
       <button onClick={() => setOpen(true)} className={`btn btn-ghost px-3 py-1.5 text-sm ${className}`}>
-        💜 Donate
+        <Heart className="h-4 w-4 fill-pink-400 text-pink-400" /> Donate
       </button>
       {open && <DonateModal onClose={() => setOpen(false)} />}
     </>

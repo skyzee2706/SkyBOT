@@ -175,7 +175,7 @@ publicRouter.get("/raffles/:id", async (req, res) => {
       requiredRoles: raffle.requiredRoleIds.map((id) => ({ id, ...(guild?.roles.get(id) ?? { name: "deleted-role", color: 0 }) })),
       quoteCount: quotePosts(raffle).length,
       hasXTasks: hasXTasks(raffle),
-      tasks: tasks.map((t) => ({ key: t.key, label: t.label })),
+      tasks: tasks.map((t) => ({ key: t.key, kind: t.kind, label: t.text })),
       entryCount,
       discordUrl: raffle.messageId ? `https://discord.com/channels/${raffle.guildId}/${raffle.channelId}/${raffle.messageId}` : null,
     },

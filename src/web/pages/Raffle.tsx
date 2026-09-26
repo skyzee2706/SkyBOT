@@ -3,13 +3,14 @@ import { Link, useParams } from "react-router-dom";
 import { api, type Entry, type Raffle } from "../api";
 import { ErrorBox, formatDate, Loading, StatusBadge } from "../components";
 import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
+import { ArrowLeft, ExternalLink, Globe, Trophy, Users } from "lucide-react";
 
 // GTD / FCFS = pemenang per allocation (raffle baru); WON = semua pemenang (raffle lama)
 type Filter = "ALL" | Entry["status"] | AllocationType;
 
 const ENTRY_STATUS: Record<Entry["status"], { label: string; cls: string }> = {
   ENTERED: { label: "Entered", cls: "text-zinc-400" },
-  WON: { label: "🏆 Won", cls: "text-emerald-400" },
+  WON: { label: "Won", cls: "text-emerald-400" },
   DISQUALIFIED: { label: "Disqualified", cls: "text-red-400" },
 };
 
@@ -54,7 +55,7 @@ export function RafflePage() {
     f === "ALL" || (f === "GTD" || f === "FCFS" ? isWinnerOf(e, f) : e.status === f);
   const filters: Filter[] = ["ALL", ...(withAllocations ? usedAllocations : (["WON"] as Filter[])), "ENTERED", "DISQUALIFIED"];
   const filterLabel = (f: Filter) =>
-    f === "ALL" ? "All" : f === "GTD" || f === "FCFS" ? `🏆 ${f} Winners` : ENTRY_STATUS[f].label;
+    f === "ALL" ? "All" : f === "GTD" || f === "FCFS" ? `${f} Winners` : ENTRY_STATUS[f].label;
   const counts = Object.fromEntries(filters.map((f) => [f, entries.filter((e) => matches(e, f)).length])) as Record<Filter, number>;
   const winnerCount = entries.filter((e) => e.status === "WON").length;
   const q = search.trim().toLowerCase();
@@ -72,7 +73,8 @@ export function RafflePage() {
   return (
     <div>
       <Link to={`/server/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
-        ← Back to server
+        <ArrowLeft className="mr-1 inline h-4 w-4" />
+        Back to server
       </Link>
       <ErrorBox error={error} />
 
@@ -93,7 +95,10 @@ export function RafflePage() {
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
             <span>{withAllocations ? `Allocations: ${allocationSummary(raffle)}` : allocationSummary(raffle)}</span>
             {chainLabel(raffle.chain) && <span>Chain: {chainLabel(raffle.chain)}</span>}
-            <span>{raffle.requireMember ? "Members only" : "🌐 Open to non-members"}</span>
+            <span className="inline-flex items-center gap-1">
+              {raffle.requireMember ? <Users className="h-4 w-4" /> : <Globe className="h-4 w-4" />}
+              {raffle.requireMember ? "Members only" : "Open to non-members"}
+            </span>
             <span>
               {entries.length} entr{entries.length === 1 ? "y" : "ies"}
             </span>
@@ -117,7 +122,7 @@ export function RafflePage() {
                 <div key={p.tweetId}>
                   • {[p.like && "Like", p.retweet && "Retweet", p.quote && "Quote"].filter(Boolean).join(" + ")}{" "}
                   <a href={`https://x.com/i/status/${p.tweetId}`} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
-                    post #{i + 1} ↗
+                    post #{i + 1} <ExternalLink className="inline h-3.5 w-3.5" />
                   </a>
                 </div>
               ))}
@@ -129,7 +134,7 @@ export function RafflePage() {
             rel="noreferrer"
             className="mr-4 mt-3 inline-block text-sm text-indigo-400 hover:underline"
           >
-            Public entry page ↗
+            Public entry page <ExternalLink className="inline h-3.5 w-3.5" />
           </a>
           {raffle.messageId && (
             <a
@@ -138,7 +143,7 @@ export function RafflePage() {
               rel="noreferrer"
               className="mt-3 inline-block text-sm text-indigo-400 hover:underline"
             >
-              View message in Discord ↗
+              View message in Discord <ExternalLink className="inline h-3.5 w-3.5" />
             </a>
           )}
         </div>
@@ -226,7 +231,7 @@ export function RafflePage() {
                         <div className="flex flex-wrap gap-2">
                           {e.xQuoteUrls.map((url, n) => (
                             <a key={url} href={url} target="_blank" rel="noreferrer" className="text-indigo-400 hover:underline">
-                              {e.xQuoteUrls.length > 1 ? `#${n + 1}` : "view"} ↗
+                              {e.xQuoteUrls.length > 1 ? `#${n + 1}` : "view"} <ExternalLink className="inline h-3.5 w-3.5" />
                             </a>
                           ))}
                         </div>
@@ -234,7 +239,10 @@ export function RafflePage() {
                     )}
                     {raffle.walletType !== "NONE" && <td className="py-2 pr-4 font-mono text-xs">{e.wallet}</td>}
                     <td className={`py-2 pr-4 ${ENTRY_STATUS[e.status].cls}`}>
-                      {e.status === "WON" && e.allocation ? `🏆 Won · ${e.allocation}` : ENTRY_STATUS[e.status].label}
+                      <span className="inline-flex items-center gap-1">
+                        {e.status === "WON" && <Trophy className="h-4 w-4" />}
+                        {e.status === "WON" && e.allocation ? `Won · ${e.allocation}` : ENTRY_STATUS[e.status].label}
+                      </span>
                       {e.note && <div className="text-xs text-zinc-500">{e.note}</div>}
                     </td>
                     <td className="py-2 pr-4 text-xs text-zinc-500">{formatDate(e.createdAt)}</td>

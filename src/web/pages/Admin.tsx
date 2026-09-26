@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api";
 import { ErrorBox, formatDate, Loading } from "../components";
+import { Lock } from "lucide-react";
+import { LogoMark } from "../Logo";
 
 type Stats = {
   totals: {
@@ -69,7 +71,7 @@ export function AdminPage() {
       <header className="border-b border-zinc-800 bg-zinc-950/80">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
           <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="text-xl">🎟️</span> SkyBOT Raffle <span className="text-sm font-normal text-zinc-500">· Admin</span>
+            <LogoMark /> SkyBOT Raffle <span className="text-sm font-normal text-zinc-500">· Admin</span>
           </Link>
           {state === "open" && (
             <button
@@ -118,7 +120,7 @@ function PinForm({ onUnlock }: { onUnlock: () => void }) {
 
   return (
     <form onSubmit={submit} className="card mx-auto mt-10 max-w-sm space-y-4 text-center">
-      <div className="text-3xl">🔒</div>
+      <Lock className="mx-auto h-8 w-8 text-indigo-400" />
       <h1 className="text-lg font-semibold">Enter admin PIN</h1>
       <input
         className="input text-center text-2xl tracking-[0.5em]"

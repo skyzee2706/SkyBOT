@@ -33,7 +33,7 @@ export function GuildsPage() {
               <div className="min-w-0 flex-1">
                 <div className="truncate font-medium">{g.name}</div>
                 <div className={`text-xs ${g.botPresent ? "text-emerald-400" : "text-zinc-500"}`}>
-                  {g.botPresent ? "Bot active → manage raffles" : "Bot not added → click to invite"}
+                  {g.botPresent ? "Bot active · manage raffles" : "Bot not added · click to invite"}
                 </div>
               </div>
             </>

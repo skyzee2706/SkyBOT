@@ -9,6 +9,8 @@ import { Footer } from "./Credits";
 import { AdminPage } from "./pages/Admin";
 import { PublicRafflePage } from "./pages/PublicRaffle";
 import { RafflesListPage } from "./pages/RafflesList";
+import { ChevronDown } from "lucide-react";
+import { LogoMark } from "./Logo";
 
 // Web bisa dibuka tanpa login: daftar raffle & halaman raffle publik.
 // Membuat / mengelola raffle butuh login Discord.
@@ -79,7 +81,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
       <div className="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex items-center gap-1 sm:gap-4">
           <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
-            <span className="text-xl">🎟️</span> <span className="hidden sm:inline">SkyBOT Raffle</span>
+            <LogoMark /> <span className="hidden sm:inline">SkyBOT Raffle</span>
           </Link>
           <NavLink to="/" end className={nav}>
             Raffles
@@ -99,7 +101,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
                 <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-700 text-xs">{me.username[0]}</div>
               )}
               <span className="hidden text-zinc-300 sm:inline">{me.username}</span>
-              <span className="text-xs text-zinc-500">▾</span>
+              <ChevronDown className="h-4 w-4 text-zinc-500" />
             </button>
             {open && (
               <div className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
@@ -129,7 +131,7 @@ function RequireLogin({ me, children }: { me: Me | null | undefined; children: R
   if (me) return <>{children}</>;
   return (
     <div className="card mx-auto mt-6 max-w-md space-y-4 text-center">
-      <div className="text-4xl">🎟️</div>
+      <LogoMark className="mx-auto h-12 w-12" />
       <h1 className="text-xl font-semibold">Log in to create raffles</h1>
       <p className="text-sm text-zinc-400">
         Log in with Discord to create and manage raffles for servers where you're an admin or have a raffle manager role.

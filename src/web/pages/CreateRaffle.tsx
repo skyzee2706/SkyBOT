@@ -5,6 +5,7 @@ import { ErrorBox, Field, Loading, RolePicker } from "../components";
 import { cleanUsername, emptyXTasks, XTasksEditor, type XTasksValue } from "./XTasksEditor";
 import { ImageInput } from "./ImageInput";
 import { ALLOCATIONS, CHAIN_IDS, CHAINS, chainWallet, CUSTOM_CHAIN_MAX, normalizeChain, type ChainId } from "../../shared/raffle";
+import { ArrowLeft } from "lucide-react";
 
 const OTHER = "__other__";
 
@@ -128,7 +129,8 @@ export function CreateRafflePage() {
   return (
     <div className="mx-auto max-w-2xl">
       <Link to={`/server/${guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
-        ← {data.guild.name}
+        <ArrowLeft className="mr-1 inline h-4 w-4" />
+        {data.guild.name}
       </Link>
       <h1 className="mb-6 text-2xl font-bold">Create Raffle</h1>
       <ErrorBox error={error} />
@@ -326,7 +328,7 @@ export function CreateRafflePage() {
 
         <section className="card space-y-4">
           <h2 className="font-semibold">Reward</h2>
-          <Field label="Give winners a role (optional)" hint="The role must be below the bot's role in Server Settings → Roles.">
+          <Field label="Give winners a role (optional)" hint="The role must be below the bot's role in Server Settings > Roles.">
             <select className="input" value={form.winnerRoleId} onChange={(e) => set("winnerRoleId", e.target.value)}>
               <option value="">— None —</option>
               {data.roles.map((r) => (

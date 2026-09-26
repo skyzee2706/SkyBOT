@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { api, guildIcon, type GuildDetail } from "../api";
 import { ErrorBox, formatDate, Loading, RolePicker, StatusBadge } from "../components";
 import { allocationSummary, chainLabel } from "../../shared/raffle";
+import { ArrowLeft, ChevronDown, Settings } from "lucide-react";
 
 // Hanya tampil untuk admin: pilih role (mis. @CM) yang boleh mengelola raffle di web.
 function ManagerRolesPanel({ data }: { data: GuildDetail }) {
@@ -18,7 +19,7 @@ function ManagerRolesPanel({ data }: { data: GuildDetail }) {
         body: { managerRoleIds: value },
       });
       setValue(r.managerRoleIds);
-      setStatus("✅ Saved");
+      setStatus("Saved");
     } catch (e) {
       setStatus((e as Error).message);
     }
@@ -27,9 +28,11 @@ function ManagerRolesPanel({ data }: { data: GuildDetail }) {
   return (
     <div className="card mb-6">
       <button className="flex w-full items-center justify-between text-left" onClick={() => setOpen(!open)}>
-        <span className="font-semibold">⚙️ Raffle manager roles</span>
+        <span className="inline-flex items-center gap-2 font-semibold">
+          <Settings className="h-4 w-4 text-zinc-400" /> Raffle manager roles
+        </span>
         <span className="text-sm text-zinc-400">
-          {value.length ? `${value.length} role${value.length > 1 ? "s" : ""}` : "Not set"} {open ? "▲" : "▼"}
+          {value.length ? `${value.length} role${value.length > 1 ? "s" : ""}` : "Not set"} <ChevronDown className={`inline h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} />
         </span>
       </button>
       {open && (
@@ -69,7 +72,8 @@ export function GuildPage() {
   return (
     <div>
       <Link to="/manage" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
-        ← All servers
+        <ArrowLeft className="mr-1 inline h-4 w-4" />
+        All servers
       </Link>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">

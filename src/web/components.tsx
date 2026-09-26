@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { RaffleStatus, Role } from "./api";
+import { Check, ChevronDown, X } from "lucide-react";
 
 export function ErrorBox({ error }: { error: string | null }) {
   if (!error) return null;
@@ -99,12 +100,12 @@ export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: s
                   toggle(r.id);
                 }}
               >
-                ×
+                <X className="h-3 w-3" />
               </button>
             </span>
           ))}
         </div>
-        <span className={`text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`}>▾</span>
+        <ChevronDown className={`h-4 w-4 shrink-0 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} />
       </div>
       {open && (
         <div className="absolute z-20 mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-900 p-2 shadow-xl">
@@ -129,7 +130,7 @@ export function RolePicker({ roles, value, onChange }: { roles: Role[]; value: s
                   }`}
                 >
                   <span style={{ color: roleColor(r.color) }}>@{r.name}</span>
-                  {on && <span className="text-indigo-400">✓</span>}
+                  {on && <Check className="h-4 w-4 text-indigo-400" />}
                 </button>
               );
             })}

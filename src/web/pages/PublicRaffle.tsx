@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
+import {
+  Ban,
+  CircleCheckBig,
+  ExternalLink,
+  Flag,
+  Globe,
+  Heart,
+  Link2,
+  Lock,
+  MessageSquareQuote,
+  Repeat2,
+  Settings,
+  Ticket,
+  Trophy,
+  UserPlus,
+  UserRoundX,
+  type LucideIcon,
+} from "lucide-react";
 import { api, loginUrl } from "../api";
 import { ErrorBox, formatDate, Loading, roleColor, StatusBadge } from "../components";
 import { timeLeft } from "./RafflesList";
@@ -25,7 +43,7 @@ type PublicRaffle = {
     requiredRoles: { id: string; name: string; color: number }[];
     quoteCount: number;
     hasXTasks: boolean;
-    tasks: { key: string; label: string }[];
+    tasks: { key: string; kind: "follow" | "like" | "retweet" | "quote"; label: string }[];
     entryCount: number;
     discordUrl: string | null;
   };
@@ -148,20 +166,22 @@ export function PublicRafflePage() {
               <div>
                 Member of <b>{guild?.name ?? "the Discord server"}</b>
                 {r.inviteUrl && (
-                  <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="ml-2 text-indigo-400 hover:underline">
-                    Join server ↗
+                  <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="ml-2 inline-flex items-center gap-1 text-indigo-400 hover:underline">
+                    Join server <ExternalLink className="h-3.5 w-3.5" />
                   </a>
                 )}
               </div>
             ) : (
-              <div>🌐 Open to everyone, no need to join the server</div>
+              <div className="flex items-center gap-2">
+                <Globe className="h-4 w-4 text-zinc-400" /> Open to everyone, no need to join the server
+              </div>
             )}
             {r.minAccountAgeDays > 0 && <div>Discord account at least {r.minAccountAgeDays} days old</div>}
             {r.walletType !== "NONE" && <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : "a Solana"} wallet</div>}
             {r.hasXTasks && <div>Connect your X account and complete the X tasks</div>}
             {r.discordUrl && (
-              <a href={r.discordUrl} target="_blank" rel="noreferrer" className="inline-block pt-2 text-indigo-400 hover:underline">
-                View in Discord ↗
+              <a href={r.discordUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 pt-2 text-indigo-400 hover:underline">
+                View in Discord <ExternalLink className="h-3.5 w-3.5" />
               </a>
             )}
           </div>
@@ -171,7 +191,7 @@ export function PublicRafflePage() {
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           {canManage && (
             <Link to={`/r/${r.id}`} className="btn btn-ghost w-full">
-              ⚙️ Manage raffle (full entrant data)
+              <Settings className="h-4 w-4" /> Manage raffle (full entrant data)
             </Link>
           )}
           <EntryPanel data={data} reload={load} />
@@ -221,7 +241,10 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
     const entry = viewer?.entry;
     return (
       <div className="card space-y-2 text-center">
-        <div className="text-3xl">{r.status === "CANCELLED" ? "❌" : entry?.status === "WON" ? "🏆" : "🏁"}</div>
+        <StatusIcon
+          icon={r.status === "CANCELLED" ? Ban : entry?.status === "WON" ? Trophy : Flag}
+          tone={r.status === "CANCELLED" ? "red" : entry?.status === "WON" ? "green" : "zinc"}
+        />
         <div className="font-semibold">{r.status === "CANCELLED" ? "This raffle was cancelled" : "This raffle has ended"}</div>
         {r.status === "ENDED" && viewer && (
           <p className="text-sm text-zinc-400">
@@ -243,7 +266,11 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
     return (
       <div className="card space-y-3 text-center">
         <div className="font-semibold">Enter this raffle</div>
-        <p className="text-sm text-zinc-400">Log in with Discord to enter. You must be a member of {guild?.name ?? "the server"}.</p>
+        <p className="text-sm text-zinc-400">
+          {r.requireMember
+            ? `Log in with Discord to enter. You must be a member of ${guild?.name ?? "the server"}.`
+            : "Log in with Discord to enter. No need to join the server."}
+        </p>
         <LoginButton returnTo={returnTo} label="Log in with Discord" />
       </div>
     );
@@ -252,9 +279,9 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
   if (viewer.entry) {
     return (
       <div className="card space-y-2 text-center">
-        <div className="text-3xl">✅</div>
+        <StatusIcon icon={CircleCheckBig} tone="green" />
         <div className="font-semibold">You're entered!</div>
-        <p className="text-sm text-zinc-400">Winners are drawn automatically when the raffle ends. Good luck 🍀</p>
+        <p className="text-sm text-zinc-400">Winners are drawn automatically when the raffle ends. Good luck!</p>
         {viewer.entry.xUsername && <p className="text-xs text-zinc-500">X: @{viewer.entry.xUsername}</p>}
         {viewer.entry.wallet && <p className="break-all font-mono text-xs text-zinc-500">{viewer.entry.wallet}</p>}
       </div>
@@ -265,16 +292,23 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
   if (r.requireMember && viewer.isMember === false) {
     return (
       <div className="card space-y-3 text-center">
-        <div className="font-semibold">Join the server first</div>
-        <p className="text-sm text-zinc-400">
-          You need to be a member of <b>{guild?.name ?? "the Discord server"}</b> to enter this raffle.
-        </p>
+        <StatusIcon icon={UserRoundX} tone="amber" />
+        <div className="font-semibold">You haven't joined the Discord server yet</div>
         {r.inviteUrl ? (
-          <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="btn btn-primary w-full">
-            Join {guild?.name ?? "server"} on Discord ↗
-          </a>
+          <>
+            <p className="text-sm text-zinc-400">
+              This raffle is only open to members of <b className="text-zinc-200">{guild?.name ?? "the community"}</b>. Join the
+              server, then come back to enter.
+            </p>
+            <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="btn btn-primary w-full py-3">
+              Join {guild?.name ?? "the Server"} Now <ExternalLink className="h-4 w-4" />
+            </a>
+          </>
         ) : (
-          <p className="text-xs text-zinc-500">Ask the community for an invite link.</p>
+          <p className="text-sm text-zinc-400">
+            This raffle is only open to members of <b className="text-zinc-200">{guild?.name ?? "the community"}</b>. Please
+            contact the community to get an invite link, then come back to enter.
+          </p>
         )}
         <button className="btn btn-ghost w-full" onClick={reload}>
           I've joined, check again
@@ -308,7 +342,13 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
           </div>
           {viewer.connectXUrl && (
             <a href={viewer.connectXUrl} className={`btn w-full ${needsX ? "btn-primary" : "btn-ghost"}`}>
-              {needsX ? "🔗 Connect X account" : "Switch X account"}
+              {needsX ? (
+                <>
+                  <Link2 className="h-4 w-4" /> Connect X account
+                </>
+              ) : (
+                "Switch X account"
+              )}
             </a>
           )}
         </div>
@@ -326,7 +366,7 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
             const state = viewer.tasks.find((v) => v.key === t.key);
             return state?.done ? (
               <div key={t.key} className="flex items-center justify-between rounded-lg border border-emerald-700 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-                {t.label} <span>✅</span>
+                <TaskLabel kind={t.kind} label={t.label} /> <CircleCheckBig className="h-4 w-4" />
               </div>
             ) : (
               <a
@@ -336,7 +376,7 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
                 rel="noreferrer"
                 className="flex items-center justify-between rounded-lg border border-zinc-700 px-3 py-2 text-sm hover:border-zinc-500"
               >
-                {t.label} <span className="text-zinc-500">↗</span>
+                <TaskLabel kind={t.kind} label={t.label} /> <ExternalLink className="h-4 w-4 text-zinc-500" />
               </a>
             );
           })}
@@ -373,7 +413,17 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
 
       {error && <p className="text-sm text-red-400">{error}</p>}
       <button className="btn btn-primary w-full py-3" disabled={busy || blocked || needsX || !tasksDone}>
-        {busy ? "Entering..." : !tasksDone || needsX ? "🔒 Complete the tasks to enter" : "🎟️ Enter raffle"}
+        {busy ? (
+          "Entering..."
+        ) : !tasksDone || needsX ? (
+          <>
+            <Lock className="h-4 w-4" /> Complete the tasks to enter
+          </>
+        ) : (
+          <>
+            <Ticket className="h-4 w-4" /> Enter raffle
+          </>
+        )}
       </button>
     </form>
   );
@@ -429,8 +479,8 @@ function Entrants({ raffleId, ended, total }: { raffleId: string; ended: boolean
               <img src={e.avatarUrl} className="h-7 w-7 rounded-full" alt="" loading="lazy" />
               <span className="min-w-0 flex-1 truncate text-sm">{e.username}</span>
               {e.winner && (
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
-                  🏆 {e.winner === "WINNER" ? "Winner" : e.winner}
+                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
+                  <Trophy className="h-3 w-3" /> {e.winner === "WINNER" ? "Winner" : e.winner}
                 </span>
               )}
             </div>
@@ -450,6 +500,37 @@ function Entrants({ raffleId, ended, total }: { raffleId: string; ended: boolean
           {busy ? "Loading..." : "Show more"}
         </button>
       )}
+    </div>
+  );
+}
+
+const TASK_ICON: Record<"follow" | "like" | "retweet" | "quote", LucideIcon> = {
+  follow: UserPlus,
+  like: Heart,
+  retweet: Repeat2,
+  quote: MessageSquareQuote,
+};
+
+function TaskLabel({ kind, label }: { kind: keyof typeof TASK_ICON; label: string }) {
+  const Icon = TASK_ICON[kind] ?? ExternalLink;
+  return (
+    <span className="inline-flex items-center gap-2">
+      <Icon className="h-4 w-4" /> {label}
+    </span>
+  );
+}
+
+const TONES = {
+  green: "bg-emerald-500/15 text-emerald-400",
+  red: "bg-red-500/15 text-red-400",
+  amber: "bg-amber-500/15 text-amber-400",
+  zinc: "bg-zinc-800 text-zinc-300",
+};
+
+function StatusIcon({ icon: Icon, tone }: { icon: LucideIcon; tone: keyof typeof TONES }) {
+  return (
+    <div className={`mx-auto grid h-12 w-12 place-items-center rounded-full ${TONES[tone]}`}>
+      <Icon className="h-6 w-6" />
     </div>
   );
 }

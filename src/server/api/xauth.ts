@@ -8,13 +8,17 @@ import { safeReturnPath } from "../../shared/raffle.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
+// Ikon SVG (bukan emoji) supaya tampil sama di semua perangkat
+const ICON_OK = `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>`;
+const ICON_ERR = `<svg class="i" viewBox="0 0 24 24" fill="none" stroke="#f87171" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>`;
+
 function page(res: Response, status: number, title: string, message: string) {
   res.status(status).type("html").send(`<!doctype html><html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#09090b;color:#f4f4f5;font:16px system-ui,sans-serif;padding:16px}
 .c{max-width:420px;text-align:center;border:1px solid #27272a;border-radius:16px;padding:32px;background:#18181b}
-h1{font-size:22px;margin:0 0 12px}p{color:#a1a1aa;line-height:1.5;margin:0}</style></head>
-<body><div class="c"><h1>${esc(title)}</h1><p>${message}</p></div></body></html>`);
+h1{font-size:22px;margin:0 0 12px}p{color:#a1a1aa;line-height:1.5;margin:0}.i{width:48px;height:48px;margin:0 auto 16px}</style></head>
+<body><div class="c">${status < 300 ? ICON_OK : ICON_ERR}<h1>${esc(title)}</h1><p>${message}</p></div></body></html>`);
 }
 
 const EXPIRED = "Click <b>Connect X</b> or <b>Enter</b> again in Discord to get a new link.";
@@ -74,7 +78,7 @@ xRouter.get("/callback", async (req, res) => {
   page(
     res,
     200,
-    "✅ X account connected",
+    "X account connected",
     `<b>@${esc(x.username)}</b> is now connected. Close this page, go back to Discord and click <b>Enter</b>.`,
   );
 });
