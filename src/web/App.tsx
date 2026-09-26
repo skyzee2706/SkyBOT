@@ -7,18 +7,21 @@ import { CreateRafflePage } from "./pages/CreateRaffle";
 import { RafflePage } from "./pages/Raffle";
 import { Footer } from "./Credits";
 import { AdminPage } from "./pages/Admin";
+import { PublicRafflePage } from "./pages/PublicRaffle";
 
 export function App() {
   const { pathname } = useLocation();
   const isAdmin = pathname.replace(/\/$/, "") === "/admin";
+  // Halaman raffle publik: bisa dibuka tanpa login, punya layout sendiri
+  const isPublicRaffle = pathname.startsWith("/raffle/");
   const [me, setMe] = useState<Me | null | undefined>(undefined);
 
   useEffect(() => {
-    if (isAdmin) return; // halaman admin tidak butuh login Discord
+    if (isAdmin || isPublicRaffle) return; // halaman ini tidak butuh login Discord
     api<Me>("/me")
       .then(setMe)
       .catch(() => setMe(null));
-  }, [isAdmin]);
+  }, [isAdmin, isPublicRaffle]);
 
   const logout = async () => {
     await api("/auth/logout", { method: "POST" });
@@ -26,6 +29,12 @@ export function App() {
   };
 
   if (isAdmin) return <AdminPage />;
+  if (isPublicRaffle)
+    return (
+      <Routes>
+        <Route path="/raffle/:id" element={<PublicRafflePage />} />
+      </Routes>
+    );
   if (me === undefined) return <div className="p-10 text-center text-zinc-500">Loading...</div>;
   if (me === null) return <Landing />;
 

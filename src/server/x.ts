@@ -76,8 +76,10 @@ export function verifyLinkToken(token: string): string | null {
   return Number(exp) > Date.now() ? discordId : null;
 }
 
-export const connectXUrl = (discordId: string) =>
-  `${env.PUBLIC_URL}/api/x/connect?t=${encodeURIComponent(createLinkToken(discordId))}`;
+// returnTo = halaman web raffle (kalau Connect X diklik dari web); kosong = dari Discord
+export const connectXUrl = (discordId: string, returnTo?: string) =>
+  `${env.PUBLIC_URL}/api/x/connect?t=${encodeURIComponent(createLinkToken(discordId))}` +
+  (returnTo ? `&r=${encodeURIComponent(returnTo)}` : "");
 
 // Tombol task tidak langsung ke X, tapi lewat /api/x/task supaya klik-nya tercatat.
 // Token bertanda tangan: [raffleId, discordId, kunci task, kedaluwarsa].

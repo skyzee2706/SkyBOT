@@ -4,6 +4,7 @@ import { db } from "../db.js";
 import { xEnabled } from "../env.js";
 import { recordTaskClick, refreshTaskMessage } from "../raffle/service.js";
 import { verifyLinkToken, verifyTaskToken, xAccessToken, xAuthorizeUrl, xRequestToken } from "../x.js";
+import { safeReturnPath } from "../../shared/raffle.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -36,7 +37,8 @@ xRouter.get("/connect", async (req, res) => {
     console.error("[x] request_token failed", e);
     return page(res, 502, "Couldn't connect to X", "Please try again in a moment. If it keeps failing, contact an admin.");
   }
-  await db.xAuthState.create({ data: { oauthToken: token, tokenSecret: secret, discordId } });
+  const returnTo = safeReturnPath(req.query.r);
+  await db.xAuthState.create({ data: { oauthToken: token, tokenSecret: secret, discordId, returnTo } });
   res.redirect(xAuthorizeUrl(token));
 });
 
@@ -59,13 +61,16 @@ xRouter.get("/callback", async (req, res) => {
   }
   const taken = await db.xLink.findUnique({ where: { xUserId: x.userId } });
   if (taken && taken.discordId !== state.discordId) {
-    return page(res, 409, "X account already in use", `<b>@${esc(x.username)}</b> is already connected to another Discord account.`);
+    const back = state.returnTo && safeReturnPath(state.returnTo) ? ` <a href="${state.returnTo}" style="color:#818cf8">Back to the raffle</a>` : "";
+    return page(res, 409, "X account already in use", `<b>@${esc(x.username)}</b> is already connected to another Discord account.${back}`);
   }
   await db.xLink.upsert({
     where: { discordId: state.discordId },
     create: { discordId: state.discordId, xUserId: x.userId, xUsername: x.username },
     update: { xUserId: x.userId, xUsername: x.username, linkedAt: new Date() },
   });
+  // Dari halaman web raffle: langsung kembali ke sana
+  if (state.returnTo && safeReturnPath(state.returnTo)) return res.redirect(state.returnTo);
   page(
     res,
     200,

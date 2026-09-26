@@ -45,3 +45,9 @@ export function allocationSummary(r: AllocationCounts, sep = " · ") {
     .map((a) => `${a} ${allocationCount(r, a)}`)
     .join(sep);
 }
+
+// Halaman raffle publik (peserta bisa ikut lewat web)
+export const publicRafflePath = (raffleId: string) => `/raffle/${raffleId}`;
+// Hanya path halaman raffle publik yang boleh jadi tujuan redirect (mencegah open redirect)
+export const safeReturnPath = (v: unknown): string | null =>
+  typeof v === "string" && /^\/raffle\/[A-Za-z0-9]{1,40}$/.test(v) ? v : null;

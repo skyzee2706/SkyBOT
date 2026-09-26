@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import { Router, type NextFunction, type Request, type Response } from "express";
 import { db } from "../db.js";
 import { env, OAUTH_REDIRECT } from "../env.js";
+import { safeReturnPath } from "../../shared/raffle.js";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const SESSION_DAYS = 7;
@@ -20,9 +21,13 @@ export async function discordUserApi<T>(path: string, accessToken: string): Prom
 
 export const authRouter = Router();
 
-authRouter.get("/login", (_req, res) => {
+authRouter.get("/login", (req, res) => {
   const state = randomBytes(16).toString("hex");
   res.cookie("oauth_state", state, { httpOnly: true, sameSite: "lax", secure, maxAge: 10 * 60_000 });
+  // ?next=/raffle/xxx → setelah login kembali ke halaman raffle itu
+  const next = safeReturnPath(req.query.next);
+  if (next) res.cookie("oauth_next", next, { httpOnly: true, sameSite: "lax", secure, maxAge: 10 * 60_000 });
+  else res.clearCookie("oauth_next");
   const params = new URLSearchParams({
     client_id: env.DISCORD_CLIENT_ID,
     redirect_uri: OAUTH_REDIRECT,
@@ -76,7 +81,9 @@ authRouter.get("/callback", async (req, res) => {
   await db.session.create({ data: { id: sid, userId: u.id, accessToken: token.access_token, expiresAt } });
 
   res.cookie("sid", sid, { httpOnly: true, sameSite: "lax", secure, expires: expiresAt });
-  res.redirect("/");
+  const next = safeReturnPath(req.cookies.oauth_next);
+  res.clearCookie("oauth_next");
+  res.redirect(next ?? "/");
 });
 
 authRouter.post("/logout", async (req, res) => {
@@ -88,6 +95,12 @@ authRouter.post("/logout", async (req, res) => {
   res.clearCookie("sid");
   res.json({ ok: true });
 });
+
+// User yang sedang login, atau null (untuk halaman yang boleh dibuka tanpa login)
+export async function currentUser(req: Request): Promise<AuthUser | null> {
+  const sid = req.cookies.sid as string | undefined;
+  return sid ? loadSession(sid) : null;
+}
 
 async function loadSession(sid: string): Promise<AuthUser | null> {
   const cached = sessionCache.get(sid);

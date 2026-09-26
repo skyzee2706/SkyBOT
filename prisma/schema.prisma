@@ -160,6 +160,7 @@ model XAuthState {
   oauthToken  String   @id
   tokenSecret String
   discordId   String
+  returnTo    String? // halaman web tujuan setelah berhasil (mis. /raffle/xxx); null = dari Discord
   createdAt   DateTime @default(now())
 }
 

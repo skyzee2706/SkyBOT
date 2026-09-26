@@ -122,6 +122,14 @@ export function RafflePage() {
               ))}
             </div>
           )}
+          <a
+            href={`/raffle/${raffle.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mr-4 mt-3 inline-block text-sm text-indigo-400 hover:underline"
+          >
+            Public entry page ↗
+          </a>
           {raffle.messageId && (
             <a
               href={`https://discord.com/channels/${raffle.guildId}/${raffle.channelId}/${raffle.messageId}`}

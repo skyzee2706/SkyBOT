@@ -6,6 +6,7 @@ import { dashboardRouter, HttpError } from "./api/dashboard.js";
 import { serveImage } from "./api/images.js";
 import { interactionsRouter } from "./api/interactions.js";
 import { adminRouter } from "./api/admin.js";
+import { publicRouter } from "./api/public.js";
 import { xRouter } from "./api/xauth.js";
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/x", xRouter);
 app.get("/api/images/:id", serveImage); // publik, tanpa login (Discord perlu mengambil gambarnya)
+app.use("/api/p", publicRouter); // halaman raffle publik — login Discord opsional
 app.use("/api/admin", adminRouter); // login pakai PIN, bukan Discord — harus sebelum dashboardRouter
 app.use("/api", dashboardRouter);
 

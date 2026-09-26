@@ -1,6 +1,7 @@
 import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "discord.js";
 import type { Raffle } from "@prisma/client";
-import { ALLOCATIONS, allocationCount, chainLabel, hasAllocations } from "../../shared/raffle.js";
+import { ALLOCATIONS, allocationCount, chainLabel, hasAllocations, publicRafflePath } from "../../shared/raffle.js";
+import { env } from "../env.js";
 import { taskClickUrl, tweetUrl } from "../x.js";
 import { getXPosts, hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
 
@@ -44,7 +45,8 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
   if (hasXTasks(raffle)) reqs.push("Connect your X account", ...xTaskLines(raffle));
 
   const embed = new EmbedBuilder()
-    .setTitle(`🎉 ${raffle.title}`)
+    .setTitle(`🎉 ${raffle.title}`.slice(0, 256))
+    .setURL(`${env.PUBLIC_URL}${publicRafflePath(raffle.id)}`) // judul biru → halaman raffle di web
     .setColor(raffle.status === "CANCELLED" ? 0x6b7280 : ended ? 0x22c55e : 0x6366f1)
     .setFooter({ text: `Raffle ID: ${raffle.id}` });
 
