@@ -69,6 +69,9 @@ model Raffle {
   // "Hosted by" di embed: nama & foto profil Discord pembuat raffle (disimpan saat dibuat)
   hostName    String?
   hostAvatar  String?
+  // Nama & ikon server saat raffle dibuat (untuk daftar raffle publik; diisi ulang otomatis kalau kosong)
+  guildName   String?
+  guildIcon   String?
   endsAt      DateTime
   status      RaffleStatus @default(ACTIVE)
 
@@ -103,7 +106,7 @@ model Raffle {
   taskProgress TaskProgress[]
 
   @@index([guildId])
-  @@index([status])
+  @@index([status, endsAt])
 }
 
 enum EntryStatus {
@@ -118,6 +121,7 @@ model Entry {
   raffle    Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
   userId    String
   username  String
+  avatar    String? // hash avatar Discord saat ikut (untuk daftar peserta publik)
   wallet    String?
   xUsername String?
   // Link quote, urutannya sama dengan post ber-task quote di Raffle.xPosts

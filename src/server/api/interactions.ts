@@ -40,6 +40,7 @@ const entrantOf = (i: GuildInteraction): Entrant => ({
   userId: i.member.user.id,
   username: i.member.user.username,
   roleIds: i.member.roles,
+  avatar: i.member.user.avatar,
 });
 
 // Kirim hasil ke pesan "sedang diproses..." yang tadi di-defer.

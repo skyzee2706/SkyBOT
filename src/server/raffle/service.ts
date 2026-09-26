@@ -77,7 +77,7 @@ export async function publishRaffle(raffle: Raffle) {
   return updated;
 }
 
-export type Entrant = { userId: string; username: string; roleIds: string[] };
+export type Entrant = { userId: string; username: string; roleIds: string[]; avatar?: string | null };
 export type Reply = string | { content: string; components?: unknown[] };
 export type Submission = { wallet?: string; quoteUrls?: (string | undefined)[] };
 
@@ -235,7 +235,7 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
 
   try {
     await db.entry.create({
-      data: { raffleId, userId: who.userId, username: who.username, wallet, xUsername, xQuoteUrls },
+      data: { raffleId, userId: who.userId, username: who.username, avatar: who.avatar ?? null, wallet, xUsername, xQuoteUrls },
     });
   } catch (e) {
     if (isUniqueViolation(e)) {

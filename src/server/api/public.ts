@@ -8,9 +8,9 @@ import { connectXUrl, taskClickUrl } from "../x.js";
 import { endRaffle, enterRaffle, type Reply } from "../raffle/service.js";
 import { checkRequirements } from "../raffle/requirements.js";
 import { hasXTasks, quotePosts, xTaskList } from "../raffle/xtasks.js";
-import { allocationSummary, chainLabel, publicRafflePath } from "../../shared/raffle.js";
+import { allocationSummary, chainLabel, discordAvatarUrl, publicRafflePath } from "../../shared/raffle.js";
 import { currentUser } from "./auth.js";
-import { HttpError } from "./dashboard.js";
+import { canManageGuild, HttpError } from "./dashboard.js";
 
 // Halaman raffle publik (/raffle/:id): siapa pun bisa melihat, peserta bisa ikut lewat web
 // dengan aturan yang sama persis seperti tombol Enter di Discord.
@@ -54,6 +54,98 @@ async function loadRaffle(req: Request) {
 
 export const publicRouter = Router();
 
+const PAGE_SIZE = 24;
+const guildIconUrl = (id: string, icon: string | null) => (icon ? `https://cdn.discordapp.com/icons/${id}/${icon}.png?size=64` : null);
+
+// Daftar raffle publik: ?status=live (sedang berjalan, yang paling cepat berakhir dulu) atau ended (terbaru dulu).
+// Raffle yang dibatalkan tidak ditampilkan.
+publicRouter.get("/raffles", async (req, res) => {
+  const live = req.query.status !== "ended";
+  const page = Math.max(0, Math.min(1000, Number(req.query.page) || 0));
+  const now = new Date();
+  const where = live ? { status: "ACTIVE" as const, endsAt: { gt: now } } : { status: "ENDED" as const };
+  const [raffles, total] = await Promise.all([
+    db.raffle.findMany({
+      where,
+      orderBy: live ? { endsAt: "asc" } : { endedAt: "desc" },
+      skip: page * PAGE_SIZE,
+      take: PAGE_SIZE,
+      include: { _count: { select: { entries: true } } },
+    }),
+    db.raffle.count({ where }),
+  ]);
+
+  // Raffle lama belum menyimpan nama server: ambil sekali dari Discord lalu simpan
+  const missing = [...new Set(raffles.filter((r) => !r.guildName).map((r) => r.guildId))];
+  const fetched = new Map<string, GuildInfo | null>();
+  await Promise.all(
+    missing.map(async (id) => {
+      const info = await guildInfo(id).catch(() => null);
+      fetched.set(id, info);
+      if (info) await db.raffle.updateMany({ where: { guildId: id, guildName: null }, data: { guildName: info.name, guildIcon: info.icon } });
+    }),
+  );
+
+  res.json({
+    total,
+    pageSize: PAGE_SIZE,
+    raffles: raffles.map((r) => {
+      const name = r.guildName ?? fetched.get(r.guildId)?.name ?? null;
+      const icon = r.guildName ? r.guildIcon : (fetched.get(r.guildId)?.icon ?? null);
+      return {
+        id: r.id,
+        title: r.title,
+        imageUrl: r.imageUrl,
+        status: r.status,
+        endsAt: r.endsAt,
+        endedAt: r.endedAt,
+        hostName: r.hostName,
+        hostAvatar: r.hostAvatar,
+        chain: chainLabel(r.chain),
+        allocations: allocationSummary(r),
+        entryCount: r._count.entries,
+        guild: { name, icon: guildIconUrl(r.guildId, icon) },
+      };
+    }),
+  });
+});
+
+// Daftar peserta publik: hanya username + foto Discord (+ tanda pemenang). Wallet, X & link quote hanya untuk host.
+publicRouter.get("/raffles/:id/entries", async (req, res) => {
+  const raffle = await db.raffle.findUnique({ where: { id: String(req.params.id) }, select: { id: true, status: true } });
+  if (!raffle) throw new HttpError(404, "Raffle not found.");
+  const page = Math.max(0, Math.min(10_000, Number(req.query.page) || 0));
+  const size = 100;
+  const select = { id: true, userId: true, username: true, avatar: true, status: true, allocation: true } as const;
+  // Setelah undian: semua pemenang tampil paling atas di halaman pertama (GTD dulu, lalu FCFS),
+  // peserta lain di bawahnya urut waktu ikut. Sebelum undian: semua urut waktu ikut.
+  const ended = raffle.status === "ENDED";
+  const [winners, others, total] = await Promise.all([
+    ended && page === 0
+      ? db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: [{ allocation: "asc" }, { createdAt: "asc" }], select })
+      : Promise.resolve([]),
+    db.entry.findMany({
+      where: { raffleId: raffle.id, ...(ended ? { status: { not: "WON" as const } } : {}) },
+      orderBy: { createdAt: "asc" },
+      skip: page * size,
+      take: size,
+      select,
+    }),
+    db.entry.count({ where: { raffleId: raffle.id } }),
+  ]);
+  const entries = [...winners, ...others];
+  res.json({
+    total,
+    hasMore: others.length === size, // halaman penuh = mungkin masih ada lanjutannya
+    entries: entries.map((e) => ({
+      id: e.id,
+      username: e.username,
+      avatarUrl: discordAvatarUrl(e.userId, e.avatar),
+      winner: e.status === "WON" ? (e.allocation ?? "WINNER") : null,
+    })),
+  });
+});
+
 publicRouter.get("/raffles/:id", async (req, res) => {
   const raffle = await loadRaffle(req);
   const [guild, entryCount, user] = await Promise.all([
@@ -87,6 +179,8 @@ publicRouter.get("/raffles/:id", async (req, res) => {
     },
     guild: guild ? { id: raffle.guildId, name: guild.name, icon: guild.icon } : null,
     viewer: user ? await viewerState(raffle, user.id) : null,
+    // Host / admin / role pengelola server ini: boleh membuka halaman kelola (data lengkap)
+    canManage: user ? await canManageGuild(raffle.guildId, user.id).catch(() => false) : false,
   });
 });
 
@@ -140,7 +234,7 @@ publicRouter.post("/raffles/:id/enter", async (req, res) => {
   // Logika yang sama dengan tombol Enter / Done di Discord (syarat, task X, wallet, quote, anti-duplikat)
   const reply = await enterRaffle(
     raffle.id,
-    { userId: user.id, username: member.user.username, roleIds: member.roles },
+    { userId: user.id, username: member.user.username, roleIds: member.roles, avatar: member.user.avatar },
     input.data,
   );
   const entered = !!(await db.entry.findUnique({ where: { raffleId_userId: { raffleId: raffle.id, userId: user.id } } }));

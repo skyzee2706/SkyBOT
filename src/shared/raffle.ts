@@ -48,6 +48,12 @@ export function allocationSummary(r: AllocationCounts, sep = " · ") {
 
 // Halaman raffle publik (peserta bisa ikut lewat web)
 export const publicRafflePath = (raffleId: string) => `/raffle/${raffleId}`;
-// Hanya path halaman raffle publik yang boleh jadi tujuan redirect (mencegah open redirect)
+// Hanya path di dalam web ini yang boleh jadi tujuan redirect (mencegah open redirect ke situs lain)
 export const safeReturnPath = (v: unknown): string | null =>
-  typeof v === "string" && /^\/raffle\/[A-Za-z0-9]{1,40}$/.test(v) ? v : null;
+  typeof v === "string" && /^\/(?!\/)[A-Za-z0-9/_-]{0,100}$/.test(v) ? v : null;
+
+// Foto profil Discord; tanpa avatar = avatar bawaan Discord
+export const discordAvatarUrl = (userId: string, hash: string | null | undefined, size = 64) =>
+  hash
+    ? `https://cdn.discordapp.com/avatars/${userId}/${hash}.png?size=${size}`
+    : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userId) >> 22n) % 6n)}.png`;

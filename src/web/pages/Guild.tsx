@@ -68,7 +68,7 @@ export function GuildPage() {
 
   return (
     <div>
-      <Link to="/" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to="/manage" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         ← All servers
       </Link>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">

@@ -8,7 +8,7 @@ import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raf
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
 import { rawImageBody, saveImage } from "./images.js";
 import { buildXlsx, type Cell, type RowStyle } from "../xlsx.js";
-import { ALLOCATIONS, allocationCount, chainLabel, chainWallet, hasAllocations, normalizeChain } from "../../shared/raffle.js";
+import { ALLOCATIONS, allocationCount, chainLabel, chainWallet, discordAvatarUrl, hasAllocations, normalizeChain } from "../../shared/raffle.js";
 
 export class HttpError extends Error {
   constructor(public status: number, message: string) {
@@ -31,6 +31,17 @@ async function requireManager(guildId: string, userId: string) {
     throw new HttpError(403, "You don't have access. Ask an admin to add your role as a raffle manager.");
   }
   return { ...ctx, managerRoleIds };
+}
+
+// Untuk halaman publik: apakah user ini boleh mengelola raffle di server tersebut (host / admin / role pengelola)
+export async function canManageGuild(guildId: string, userId: string) {
+  try {
+    await requireManager(guildId, userId);
+    return true;
+  } catch (e) {
+    if (e instanceof HttpError) return false;
+    throw e;
+  }
 }
 
 async function requireAdmin(guildId: string, userId: string) {
@@ -205,11 +216,6 @@ const createSchema = z.object({
     .default([]),
 });
 
-const discordAvatarUrl = (userId: string, hash: string | null) =>
-  hash
-    ? `https://cdn.discordapp.com/avatars/${userId}/${hash}.png?size=128`
-    : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(userId) >> 22n) % 6n)}.png`;
-
 const tweetIdFrom = (s: string) => s.match(/status(?:es)?\/(\d+)/)?.[1] ?? (/^\d+$/.test(s) ? s : null);
 
 dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
@@ -260,7 +266,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       winnerCount,
       chain,
       hostName: user.username,
-      hostAvatar: discordAvatarUrl(user.id, user.avatar),
+      hostAvatar: discordAvatarUrl(user.id, user.avatar, 128),
+      guildName: ctx.guild.name,
+      guildIcon: ctx.guild.icon,
       createdById: user.id,
     },
   });

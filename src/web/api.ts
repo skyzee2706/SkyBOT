@@ -89,3 +89,6 @@ export const guildIcon = (g: { id: string; icon: string | null }) =>
 
 export const avatarUrl = (u: Me) =>
   u.avatar ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64` : null;
+
+// Login Discord lalu kembali ke halaman ini
+export const loginUrl = (returnTo: string) => `/api/auth/login?next=${encodeURIComponent(returnTo)}`;

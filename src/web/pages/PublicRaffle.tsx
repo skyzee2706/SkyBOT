@@ -1,8 +1,8 @@
-import { useCallback, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { api } from "../api";
+import { api, loginUrl } from "../api";
 import { ErrorBox, formatDate, Loading, roleColor, StatusBadge } from "../components";
-import { Footer } from "../Credits";
+import { timeLeft } from "./RafflesList";
 
 type PublicRaffle = {
   raffle: {
@@ -28,6 +28,7 @@ type PublicRaffle = {
     discordUrl: string | null;
   };
   guild: { id: string; name: string; icon: string | null } | null;
+  canManage: boolean;
   viewer: null | {
     userId: string;
     entry: null | {
@@ -45,15 +46,6 @@ type PublicRaffle = {
   };
 };
 
-// "2d 4h" / "3h 12m" / "45s"
-function timeLeft(iso: string, now: number) {
-  const s = Math.max(0, Math.floor((new Date(iso).getTime() - now) / 1000));
-  const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600), m = Math.floor((s % 3600) / 60);
-  if (d) return `${d}d ${h}h`;
-  if (h) return `${h}h ${m}m`;
-  if (m) return `${m}m ${s % 60}s`;
-  return `${s}s`;
-}
 
 // Halaman raffle publik: bisa dibuka tanpa login, ikut raffle butuh login Discord.
 export function PublicRafflePage() {
@@ -95,12 +87,12 @@ export function PublicRafflePage() {
     }
   }, [ended, load]);
 
-  if (!data) return <Shell>{error ? <ErrorBox error={error} /> : <Loading />}</Shell>;
-  const { raffle: r, guild, viewer } = data;
+  if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
+  const { raffle: r, guild, viewer, canManage } = data;
   const active = r.status === "ACTIVE";
 
   return (
-    <Shell viewer={viewer} returnTo={`/raffle/${r.id}`}>
+    <>
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="space-y-6">
           <div className="card">
@@ -162,13 +154,19 @@ export function PublicRafflePage() {
               </a>
             )}
           </div>
+          <Entrants raffleId={r.id} ended={r.status === "ENDED"} total={r.entryCount} />
         </div>
 
-        <div className="lg:sticky lg:top-6 lg:self-start">
+        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
+          {canManage && (
+            <Link to={`/r/${r.id}`} className="btn btn-ghost w-full">
+              ⚙️ Manage raffle (full entrant data)
+            </Link>
+          )}
           <EntryPanel data={data} reload={load} />
         </div>
       </div>
-    </Shell>
+    </>
   );
 }
 
@@ -364,29 +362,75 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
 
 function LoginButton({ returnTo, label }: { returnTo: string; label: string }) {
   return (
-    <a href={`/api/auth/login?next=${encodeURIComponent(returnTo)}`} className="btn btn-primary w-full">
+    <a href={loginUrl(returnTo)} className="btn btn-primary w-full">
       {label}
     </a>
   );
 }
 
-function Shell({ children, viewer, returnTo }: { children: ReactNode; viewer?: PublicRaffle["viewer"]; returnTo?: string }) {
+type EntrantRow = { id: string; username: string; avatarUrl: string; winner: "GTD" | "FCFS" | "WINNER" | null };
+
+// Daftar peserta publik: username + foto Discord saja (wallet / X hanya terlihat oleh host di halaman kelola)
+function Entrants({ raffleId, ended, total }: { raffleId: string; ended: boolean; total: number }) {
+  const [rows, setRows] = useState<EntrantRow[] | null>(null);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(
+    async (p: number) => {
+      const d = await api<{ entries: EntrantRow[]; hasMore: boolean }>(`/p/raffles/${raffleId}/entries?page=${p}`);
+      setRows((prev) => (p === 0 ? d.entries : [...(prev ?? []), ...d.entries]));
+      setHasMore(d.hasMore);
+      setPage(p);
+    },
+    [raffleId],
+  );
+  // Muat ulang saat jumlah peserta / status berubah (mis. setelah ikut atau setelah undian)
+  useEffect(() => {
+    load(0).catch(() => setRows([]));
+  }, [load, total, ended]);
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="border-b border-zinc-800 bg-zinc-950/80 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Link to="/" className="flex items-center gap-2 font-semibold">
-            <span className="text-xl">🎟️</span> SkyBOT Raffle
-          </Link>
-          {viewer === null && returnTo && (
-            <a href={`/api/auth/login?next=${encodeURIComponent(returnTo)}`} className="text-sm text-zinc-300 hover:text-white">
-              Log in
-            </a>
-          )}
+    <div className="card">
+      <h2 className="mb-3 font-semibold">
+        Entrants <span className="text-zinc-500">({total})</span>
+      </h2>
+      {!rows ? (
+        <Loading />
+      ) : rows.length === 0 ? (
+        <p className="text-sm text-zinc-500">No one has entered yet. Be the first!</p>
+      ) : (
+        <div className="grid gap-2 sm:grid-cols-2">
+          {rows.map((e) => (
+            <div
+              key={e.id}
+              className={`flex items-center gap-2 rounded-lg px-2 py-1.5 ${e.winner ? "bg-emerald-500/10 ring-1 ring-emerald-700" : ""}`}
+            >
+              <img src={e.avatarUrl} className="h-7 w-7 rounded-full" alt="" loading="lazy" />
+              <span className="min-w-0 flex-1 truncate text-sm">{e.username}</span>
+              {e.winner && (
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs text-emerald-300">
+                  🏆 {e.winner === "WINNER" ? "Winner" : e.winner}
+                </span>
+              )}
+            </div>
+          ))}
         </div>
-      </header>
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">{children}</main>
-      <Footer />
+      )}
+      {hasMore && (
+        <button
+          className="btn btn-ghost mt-3 w-full"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await load(page + 1).catch(() => {});
+            setBusy(false);
+          }}
+        >
+          {busy ? "Loading..." : "Show more"}
+        </button>
+      )}
     </div>
   );
 }
