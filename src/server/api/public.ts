@@ -337,6 +337,7 @@ publicRouter.post("/raffles/:id/enter", async (req, res) => {
       ? { userId: user.id, username: member.user.username, roleIds: member.roles, avatar: member.user.avatar }
       : { userId: user.id, username: user.username, roleIds: [], avatar: user.avatar },
     input.data,
+    { requireTaskClicks: true }, // di web task X tetap harus dibuka sampai hijau
   );
   const entered = !!(await db.entry.findUnique({ where: { raffleId_userId: { raffleId: raffle.id, userId: user.id } } }));
   res.status(entered ? 200 : 400).json(entered ? { ok: true, message: plainText(reply, guild) } : { error: plainText(reply, guild) });

@@ -113,6 +113,27 @@ export async function connectXReply(userId: string): Promise<Reply> {
   };
 }
 
+// Tombol Enter di Discord untuk raffle dengan task X: tentukan langkah berikutnya.
+// form = tampilkan form wallet / link quote; enter = langsung ikut; lainnya = balasan (sudah ikut, belum connect X, dst.)
+export type DiscordEntryStep =
+  | { kind: "reply"; reply: Reply }
+  | { kind: "form"; walletType: string; quoteCount: number }
+  | { kind: "enter" };
+
+export async function discordEntryStep(raffleId: string, userId: string): Promise<DiscordEntryStep> {
+  const [raffle, xLink, entry] = await Promise.all([
+    db.raffle.findUnique({ where: { id: raffleId } }),
+    db.xLink.findUnique({ where: { discordId: userId } }),
+    db.entry.findUnique({ where: { raffleId_userId: { raffleId, userId } } }),
+  ]);
+  if (!raffle || raffle.status !== "ACTIVE" || raffle.endsAt.getTime() <= Date.now()) return { kind: "reply", reply: ENDED };
+  if (entry) return { kind: "reply", reply: ALREADY_ENTERED };
+  if (hasXTasks(raffle) && !xLink) return { kind: "reply", reply: notLinkedReply(userId) };
+  const quoteCount = hasXTasks(raffle) ? quotePosts(raffle).length : 0;
+  if (quoteCount || raffle.walletType !== "NONE") return { kind: "form", walletType: raffle.walletType, quoteCount };
+  return { kind: "enter" };
+}
+
 // Token interaksi Discord berlaku 15 menit; setelah itu pesan task tidak bisa diperbarui lagi.
 const INTERACTION_TOKEN_TTL_MS = 14 * 60_000;
 export type InteractionRef = { appId: string; token: string };
@@ -207,7 +228,13 @@ function validateQuotes(raffle: Raffle, xUsername: string, submitted: (string | 
   return urls;
 }
 
-export async function enterRaffle(raffleId: string, who: Entrant, input: Submission = {}): Promise<Reply> {
+// Web: peserta wajib membuka semua task X dulu (requireTaskClicks). Discord: cukup Enter + form.
+export async function enterRaffle(
+  raffleId: string,
+  who: Entrant,
+  input: Submission = {},
+  opts: { requireTaskClicks?: boolean } = {},
+): Promise<Reply> {
   const raffle = await loadForEntry(raffleId, who);
   if (typeof raffle === "string") return raffle;
 
@@ -217,10 +244,12 @@ export async function enterRaffle(raffleId: string, who: Entrant, input: Submiss
     const xLink = await db.xLink.findUnique({ where: { discordId: who.userId } });
     if (!xLink) return notLinkedReply(who.userId);
     xUsername = xLink.xUsername;
-    const progress = await db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId, userId: who.userId } } });
-    const done = new Set(progress?.done);
-    if (!xTaskList(raffle).every((t) => done.has(t.key))) {
-      return "❌ Open every task button first (each one turns green ✅). Click **Enter** on the raffle to see your tasks.";
+    if (opts.requireTaskClicks) {
+      const progress = await db.taskProgress.findUnique({ where: { raffleId_userId: { raffleId, userId: who.userId } } });
+      const done = new Set(progress?.done);
+      if (!xTaskList(raffle).every((t) => done.has(t.key))) {
+        return "❌ Open every task button first (each one turns green ✅). Click **Enter** on the raffle to see your tasks.";
+      }
     }
     const quotes = validateQuotes(raffle, xLink.xUsername, input.quoteUrls ?? []);
     if (typeof quotes === "string") return quotes;

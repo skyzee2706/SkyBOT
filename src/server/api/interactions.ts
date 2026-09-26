@@ -2,6 +2,7 @@ import { createPublicKey, verify } from "node:crypto";
 import { Router } from "express";
 import { waitUntil } from "@vercel/functions";
 import {
+  ButtonStyle,
   ComponentType,
   InteractionResponseType,
   InteractionType,
@@ -14,7 +15,15 @@ import {
 } from "discord.js";
 import { rest } from "../discord.js";
 import { env } from "../env.js";
-import { connectXReply, enterRaffle, entryStatus, startXTasks, type Entrant, type Reply } from "../raffle/service.js";
+import {
+  connectXReply,
+  discordEntryStep,
+  enterRaffle,
+  entryStatus,
+  type DiscordEntryStep,
+  type Entrant,
+  type Reply,
+} from "../raffle/service.js";
 import { readRawBody } from "./rawBody.js";
 
 const publicKey = createPublicKey({
@@ -105,6 +114,33 @@ function entryModal(raffleId: string, walletType: string, quoteCount: number) {
   };
 }
 
+// Balasan langsung (bukan defer) yang hanya terlihat oleh yang klik
+const ephemeralReply = (reply: Reply) => {
+  const body = typeof reply === "string" ? { content: reply, components: [] } : { components: [], ...reply };
+  return { type: InteractionResponseType.ChannelMessageWithSource, data: { ...body, flags: MessageFlags.Ephemeral } };
+};
+
+// Dipakai kalau database lambat: form tidak bisa langsung muncul (batas 3 detik Discord), jadi lewat tombol Continue
+const continueReply = (raffleId: string, step: Extract<DiscordEntryStep, { kind: "form" }>): Reply => ({
+  content: "Click **Continue** to finish your entry.",
+  components: [
+    {
+      type: ComponentType.ActionRow,
+      components: [
+        {
+          type: ComponentType.Button,
+          style: ButtonStyle.Primary,
+          label: "Continue",
+          custom_id: `raffle:confirm:${raffleId}:${step.walletType}:${step.quoteCount ? `Q${step.quoteCount}` : "-"}`,
+        },
+      ],
+    },
+  ],
+});
+
+const withTimeout = <T,>(p: Promise<T>, ms: number) =>
+  Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+
 const ephemeral = (content: string) => ({
   type: InteractionResponseType.ChannelMessageWithSource,
   data: { content, flags: MessageFlags.Ephemeral },
@@ -136,8 +172,8 @@ interactionsRouter.post("/", async (req, res) => {
   // "Q3" = 3 link quote; "Q" (tombol versi lama) = 1
   const quoteCount = flag?.startsWith("Q") ? Math.min(5, Number(flag.slice(1)) || 1) : 0;
 
-  // Form (modal) harus jadi respons pertama (maks 3 detik), jadi dikirim langsung tanpa query database.
-  // Enter tanpa task X → langsung form wallet. Dengan task X → form muncul setelah "Done, enter me".
+  // Form (modal) harus jadi respons pertama (maks 3 detik).
+  // Enter tanpa task X → langsung form wallet tanpa query database. Dengan task X → lihat di bawah.
   if (isButton && action === "enter" && flag !== "X" && needsWallet) {
     res.json(entryModal(raffleId, walletType, 0));
     return;
@@ -149,11 +185,31 @@ interactionsRouter.post("/", async (req, res) => {
 
   let work: (() => Promise<Reply>) | null = null;
   let updateSameMessage = false;
-  if (isButton && action === "enter") {
-    work =
-      flag === "X"
-        ? () => startXTasks(raffleId, entrantOf(gi), { appId: i.application_id, token: i.token })
-        : () => enterRaffle(raffleId, entrantOf(gi));
+  if (isButton && action === "enter" && flag === "X") {
+    // Raffle dengan task X: cukup Enter. Belum connect X → tombol Connect X; perlu wallet / link quote → form.
+    const step = await withTimeout(
+      discordEntryStep(raffleId, gi.member.user.id).catch(() => null),
+      2000,
+    );
+    if (step?.kind === "form") {
+      res.json(entryModal(raffleId, step.walletType, step.quoteCount));
+      return;
+    }
+    if (step?.kind === "reply") {
+      res.json(ephemeralReply(step.reply));
+      return;
+    }
+    work = step
+      ? () => enterRaffle(raffleId, entrantOf(gi))
+      : async () => {
+          // Database lambat: tentukan langkahnya setelah defer
+          const s = await discordEntryStep(raffleId, gi.member.user.id);
+          if (s.kind === "reply") return s.reply;
+          if (s.kind === "form") return continueReply(raffleId, s);
+          return enterRaffle(raffleId, entrantOf(gi));
+        };
+  } else if (isButton && action === "enter") {
+    work = () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "confirm") {
     // Tombol ada di pesan daftar task (ephemeral) — hasilnya menggantikan pesan itu.
     updateSameMessage = true;
