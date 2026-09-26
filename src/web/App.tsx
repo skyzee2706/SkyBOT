@@ -9,6 +9,7 @@ import { Footer } from "./Credits";
 import { AdminPage } from "./pages/Admin";
 import { PublicRafflePage } from "./pages/PublicRaffle";
 import { RafflesListPage } from "./pages/RafflesList";
+import { LandingPage } from "./pages/Landing";
 import { ChevronDown } from "lucide-react";
 import { LogoMark } from "./Logo";
 
@@ -34,9 +35,12 @@ export function App() {
       <Header me={me} onLogout={() => setMe(null)} />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8">
         <Routes>
-          <Route path="/" element={<RafflesListPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/raffles" element={<RafflesListPage />} />
           <Route path="/raffle/:id" element={<PublicRafflePage />} />
-          <Route path="/manage" element={auth(<GuildsPage />)} />
+          <Route path="/create" element={auth(<GuildsPage />)} />
+          {/* Link lama /manage tetap jalan */}
+          <Route path="/manage" element={<Navigate to="/create" replace />} />
           <Route path="/server/:guildId" element={auth(<GuildPage />)} />
           <Route path="/server/:guildId/new" element={auth(<CreateRafflePage />)} />
           <Route path="/r/:id" element={auth(<RafflePage />)} />
@@ -69,7 +73,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
     setOpen(false);
     onLogout();
     // Halaman kelola butuh login; kembali ke daftar raffle
-    if (!pathname.startsWith("/raffle/") && pathname !== "/") navigate("/");
+    if (!pathname.startsWith("/raffle") && pathname !== "/") navigate("/");
   };
 
   const nav = ({ isActive }: { isActive: boolean }) =>
@@ -83,10 +87,10 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
           <Link to="/" className="mr-1 flex items-center gap-2 font-semibold">
             <LogoMark /> <span className="hidden text-brand-50 sm:inline">SkyBOT <span className="text-brand-400">Raffle</span></span>
           </Link>
-          <NavLink to="/" end className={nav}>
+          <NavLink to="/raffles" className={({ isActive }) => nav({ isActive: isActive || pathname.startsWith("/raffle/") })}>
             Raffles
           </NavLink>
-          <NavLink to="/manage" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
+          <NavLink to="/create" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
             Create Raffle
           </NavLink>
         </div>
@@ -105,7 +109,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
             </button>
             {open && (
               <div className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
-                <Link to="/manage" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
+                <Link to="/create" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
                   My servers
                 </Link>
                 <button onClick={logout} className="block w-full rounded-md px-3 py-2 text-left text-sm text-red-400 hover:bg-zinc-800">

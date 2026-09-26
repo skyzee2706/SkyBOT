@@ -4,7 +4,7 @@ import { api } from "../api";
 import { ErrorBox, formatDate, Loading } from "../components";
 import { Ticket } from "lucide-react";
 
-type RaffleCard = {
+export type RaffleCardData = {
   id: string;
   title: string;
   imageUrl: string | null;
@@ -18,7 +18,7 @@ type RaffleCard = {
   entryCount: number;
   guild: { name: string | null; icon: string | null };
 };
-type ListResponse = { total: number; pageSize: number; raffles: RaffleCard[] };
+type ListResponse = { total: number; pageSize: number; raffles: RaffleCardData[] };
 type Tab = "live" | "ended";
 
 export function timeLeft(iso: string, now: number) {
@@ -34,7 +34,7 @@ export function timeLeft(iso: string, now: number) {
 export function RafflesListPage() {
   const [params, setParams] = useSearchParams();
   const tab: Tab = params.get("tab") === "ended" ? "ended" : "live";
-  const [items, setItems] = useState<RaffleCard[] | null>(null);
+  const [items, setItems] = useState<RaffleCardData[] | null>(null);
   const [total, setTotal] = useState(0);
   const [page, setPage] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -99,10 +99,25 @@ export function RafflesListPage() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {items?.map((r) => {
-          const live = r.status === "ACTIVE" && new Date(r.endsAt).getTime() > now;
-          return (
-            <Link key={r.id} to={`/raffle/${r.id}`} className="card flex flex-col gap-3 p-0 transition hover:border-brand-500/50">
+        {items?.map((r) => <RaffleCard key={r.id} r={r} now={now} />)}
+      </div>
+
+      {items && items.length < total && (
+        <div className="mt-6 text-center">
+          <button className="btn btn-ghost" onClick={more} disabled={loadingMore}>
+            {loadingMore ? "Loading..." : "Load more"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Kartu raffle (dipakai di daftar raffle & landing page)
+export function RaffleCard({ r, now }: { r: RaffleCardData; now: number }) {
+  const live = r.status === "ACTIVE" && new Date(r.endsAt).getTime() > now;
+  return (
+    <Link to={`/raffle/${r.id}`} className="card flex flex-col gap-3 p-0 transition hover:border-brand-500/50">
               {r.imageUrl ? (
                 <img src={r.imageUrl} className="h-40 w-full rounded-t-2xl object-cover" alt="" />
               ) : (
@@ -132,17 +147,5 @@ export function RafflesListPage() {
                 </div>
               </div>
             </Link>
-          );
-        })}
-      </div>
-
-      {items && items.length < total && (
-        <div className="mt-6 text-center">
-          <button className="btn btn-ghost" onClick={more} disabled={loadingMore}>
-            {loadingMore ? "Loading..." : "Load more"}
-          </button>
-        </div>
-      )}
-    </div>
   );
 }

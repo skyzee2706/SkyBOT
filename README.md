@@ -20,7 +20,7 @@ and draw fair GTD / FCFS winners the moment a raffle ends.
 
 <br/>
 
-<img src="docs/screenshots/raffles.png" alt="Public raffle browser" width="900" />
+<img src="docs/screenshots/landing.png" alt="SkyBOT Raffle landing page" width="900" />
 
 </div>
 
@@ -65,7 +65,8 @@ re-verified against Discord, and the results are announced in the channel, split
 <td width="50%" valign="top">
 
 ### Web experience
-- Public **raffle browser** with Live and Ended tabs, no login required to browse
+- Landing page with live platform stats and raffles that are live right now
+- Public **raffle browser** (`/raffles`) with Live and Ended tabs, no login required to browse
 - **Enter from the browser** with the same rules as Discord
 - Public **entrant list** (Discord name and avatar only) with winner badges
 - Countdown timers, invite-link "Join server" flow, and mobile-friendly layout
@@ -84,6 +85,8 @@ re-verified against Discord, and the results are announced in the channel, split
 </table>
 
 <div align="center">
+<img src="docs/screenshots/raffles.png" alt="Raffle browser" width="98%" />
+<br/><br/>
 <img src="docs/screenshots/raffle.png" alt="Raffle page with web entry" width="49%" />
 <img src="docs/screenshots/create.png" alt="Create raffle form" width="49%" />
 </div>

@@ -55,6 +55,23 @@ async function loadRaffle(req: Request) {
 export const publicRouter = Router();
 
 const PAGE_SIZE = 24;
+
+// Angka ringkas untuk landing page (tanpa data pribadi), di-cache 1 menit
+let statsCache: { at: number; data: unknown } | null = null;
+publicRouter.get("/stats", async (_req, res) => {
+  if (!statsCache || Date.now() - statsCache.at > 60_000) {
+    const now = new Date();
+    const [raffles, live, entries, winners, communities] = await Promise.all([
+      db.raffle.count({ where: { status: { not: "CANCELLED" } } }),
+      db.raffle.count({ where: { status: "ACTIVE", endsAt: { gt: now } } }),
+      db.entry.count(),
+      db.entry.count({ where: { status: "WON" } }),
+      db.raffle.findMany({ distinct: ["guildId"], select: { guildId: true } }).then((r) => r.length),
+    ]);
+    statsCache = { at: Date.now(), data: { raffles, live, entries, winners, communities } };
+  }
+  res.json(statsCache.data);
+});
 const guildIconUrl = (id: string, icon: string | null) => (icon ? `https://cdn.discordapp.com/icons/${id}/${icon}.png?size=64` : null);
 
 // Daftar raffle publik: ?status=live (sedang berjalan, yang paling cepat berakhir dulu) atau ended (terbaru dulu).
