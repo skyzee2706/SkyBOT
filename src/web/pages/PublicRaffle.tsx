@@ -205,8 +205,8 @@ export function PublicRafflePage() {
               </div>
             )}
             {r.minAccountAgeDays > 0 && <div>Discord account at least {r.minAccountAgeDays} days old</div>}
-            {r.walletType !== "NONE" && <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : "a Solana"} wallet</div>}
             {r.hasXTasks && <div>Connect your X account and complete the X tasks</div>}
+            {r.walletType !== "NONE" && <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : "a Solana"} wallet</div>}
             {r.discordUrl && (
               <a href={r.discordUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 pt-2 text-brand-400 hover:underline">
                 View in Discord <ExternalLink className="h-3.5 w-3.5" />
