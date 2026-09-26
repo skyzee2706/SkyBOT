@@ -80,6 +80,10 @@ model Raffle {
   blockedRoleIds     String[]   // fitur lama (sudah dihapus dari dashboard), tetap dicek untuk raffle lama
   // true = cukup punya SALAH SATU required role (raffle baru); false = harus punya semua (raffle lama)
   requireAnyRole     Boolean    @default(false)
+  // true = peserta wajib member server (default, juga untuk semua raffle lama);
+  // false = non-member boleh ikut lewat web (required role tidak bisa dipakai)
+  requireMember      Boolean    @default(true)
+  inviteUrl          String? // link invite server (opsional), jadi tombol "Join server" di web
   minAccountAgeDays  Int        @default(0)
   walletType         WalletType @default(NONE)
 

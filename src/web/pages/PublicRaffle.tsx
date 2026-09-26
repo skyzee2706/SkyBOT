@@ -20,6 +20,8 @@ type PublicRaffle = {
     walletType: "NONE" | "EVM" | "SOL";
     minAccountAgeDays: number;
     requireAnyRole: boolean;
+    requireMember: boolean;
+    inviteUrl: string | null;
     requiredRoles: { id: string; name: string; color: number }[];
     quoteCount: number;
     hasXTasks: boolean;
@@ -142,12 +144,21 @@ export function PublicRafflePage() {
                 ))}
               </div>
             )}
+            {r.requireMember ? (
+              <div>
+                Member of <b>{guild?.name ?? "the Discord server"}</b>
+                {r.inviteUrl && (
+                  <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="ml-2 text-indigo-400 hover:underline">
+                    Join server ↗
+                  </a>
+                )}
+              </div>
+            ) : (
+              <div>🌐 Open to everyone, no need to join the server</div>
+            )}
             {r.minAccountAgeDays > 0 && <div>Discord account at least {r.minAccountAgeDays} days old</div>}
             {r.walletType !== "NONE" && <div>Submit {r.walletType === "EVM" ? "an EVM (0x...)" : "a Solana"} wallet</div>}
             {r.hasXTasks && <div>Connect your X account and complete the X tasks</div>}
-            {!r.requiredRoles.length && !r.minAccountAgeDays && r.walletType === "NONE" && !r.hasXTasks && (
-              <div className="text-zinc-400">None, anyone in the server can join.</div>
-            )}
             {r.discordUrl && (
               <a href={r.discordUrl} target="_blank" rel="noreferrer" className="inline-block pt-2 text-indigo-400 hover:underline">
                 View in Discord ↗
@@ -250,13 +261,21 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
     );
   }
 
-  if (viewer.isMember === false) {
+  // Raffle khusus member: non-member harus join server dulu (task tambahan)
+  if (r.requireMember && viewer.isMember === false) {
     return (
-      <div className="card space-y-2 text-center">
+      <div className="card space-y-3 text-center">
         <div className="font-semibold">Join the server first</div>
         <p className="text-sm text-zinc-400">
           You need to be a member of <b>{guild?.name ?? "the Discord server"}</b> to enter this raffle.
         </p>
+        {r.inviteUrl ? (
+          <a href={r.inviteUrl} target="_blank" rel="noreferrer" className="btn btn-primary w-full">
+            Join {guild?.name ?? "server"} on Discord ↗
+          </a>
+        ) : (
+          <p className="text-xs text-zinc-500">Ask the community for an invite link.</p>
+        )}
         <button className="btn btn-ghost w-full" onClick={reload}>
           I've joined, check again
         </button>

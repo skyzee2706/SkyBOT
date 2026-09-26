@@ -284,7 +284,11 @@ async function pickWinners(raffle: Raffle, count: number, allocation: Allocation
   for (const c of candidates) {
     if (winners.length >= count) break;
     const member = await fetchMember(raffle.guildId, c.userId);
-    const errors = member ? checkRequirements(raffle, { userId: c.userId, roleIds: member.roles }) : ["Left the server"];
+    // Raffle tanpa syarat member: non-member tetap dicek syarat lain (mis. umur akun), tanpa role
+    const errors =
+      member || !raffle.requireMember
+        ? checkRequirements(raffle, { userId: c.userId, roleIds: member?.roles ?? [] })
+        : ["Left the server"];
     if (errors.length) {
       await db.entry.update({ where: { id: c.id }, data: { status: "DISQUALIFIED", note: errors.join("; ") } });
       continue;

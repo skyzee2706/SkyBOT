@@ -31,6 +31,8 @@ export function CreateRafflePage() {
     customChain: "", // diisi kalau pilih "Other"
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
+    requireMember: true, // peserta wajib member server
+    inviteUrl: "",
     minAccountAgeDays: 0,
     walletType: "NONE" as "NONE" | "EVM" | "SOL",
     winnerRoleId: "",
@@ -61,6 +63,10 @@ export function CreateRafflePage() {
     if (!form.title.trim()) e.title = "Title is required";
     if (!form.channelId) e.channelId = "Please choose a channel";
     if (!form.chain) e.chain = "Please choose a chain";
+    const invite = form.inviteUrl.trim();
+    if (form.requireMember && invite && !/^(https?:\/\/)?(www\.)?(discord\.gg|discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,32}\/?$/i.test(invite)) {
+      e.inviteUrl = "Invalid Discord invite link (e.g. https://discord.gg/abc123)";
+    }
     else if (form.chain === OTHER && !form.customChain.trim()) e.chain = "Type the chain name";
     const picked = ALLOCATIONS.filter((a) => form[a === "GTD" ? "gtd" : "fcfs"].on);
     const bad = picked.find((a) => {
@@ -102,6 +108,7 @@ export function CreateRafflePage() {
         body: {
           ...rest,
           chain: chainValue,
+          inviteUrl: form.requireMember ? form.inviteUrl.trim() : "",
           gtdCount: gtd.on ? gtd.count : 0,
           fcfsCount: fcfs.on ? fcfs.count : 0,
           endsAt: new Date(form.endsAt).toISOString(),
@@ -233,8 +240,52 @@ export function CreateRafflePage() {
 
         <section className="card space-y-4">
           <h2 className="font-semibold">Discord Requirements</h2>
-          <Field label="Required roles (optional)" hint="Entrants need at least ONE of the selected roles. Leave empty = anyone can join.">
-            <RolePicker roles={data.roles} value={form.requiredRoleIds} onChange={(v) => set("requiredRoleIds", v)} />
+          <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-zinc-800 p-3">
+            <input
+              type="checkbox"
+              className="mt-1"
+              checked={form.requireMember}
+              onChange={(e) => {
+                set("requireMember", e.target.checked);
+                if (!e.target.checked) set("requiredRoleIds", []); // role hanya bisa dicek untuk member
+              }}
+            />
+            <span>
+              <span className="block text-sm font-medium">Entrants must be members of {data.guild.name}</span>
+              <span className="hint block">
+                {form.requireMember
+                  ? "Non-members can still view the raffle on the web, but must join the server to enter."
+                  : "Anyone with a Discord account can enter on the web page, even without joining the server."}
+              </span>
+            </span>
+          </label>
+          {form.requireMember && (
+            <Field
+              label="Server invite link (optional)"
+              hint="Shown as a “Join server” button to visitors who aren't members yet. Use a link that doesn't expire."
+              error={errors.inviteUrl}
+            >
+              <input
+                className="input"
+                placeholder="https://discord.gg/yourserver"
+                value={form.inviteUrl}
+                onChange={(e) => set("inviteUrl", e.target.value)}
+              />
+            </Field>
+          )}
+          <Field
+            label="Required roles (optional)"
+            hint={
+              form.requireMember
+                ? "Entrants need at least ONE of the selected roles. Leave empty = any member can join."
+                : "Roles can only be checked for server members. Turn on “must be members” to use this."
+            }
+          >
+            {form.requireMember ? (
+              <RolePicker roles={data.roles} value={form.requiredRoleIds} onChange={(v) => set("requiredRoleIds", v)} />
+            ) : (
+              <div className="input text-zinc-500">Not available for raffles open to non-members</div>
+            )}
           </Field>
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Minimum Discord account age (days)" hint="0 = no limit. Helps block alt accounts.">

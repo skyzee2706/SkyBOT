@@ -188,6 +188,17 @@ const createSchema = z.object({
     .refine((s) => s.length > 0, "Chain is required"),
   endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
   requiredRoleIds: z.array(z.string()).default([]),
+  requireMember: z.boolean().default(true),
+  // Link invite Discord (discord.gg/... atau discord.com/invite/...), opsional
+  inviteUrl: z
+    .string()
+    .trim()
+    .transform((s) => (s && !/^https?:\/\//i.test(s) ? `https://${s}` : s))
+    .refine(
+      (s) => !s || /^https:\/\/(www\.)?(discord\.gg|discord(app)?\.com\/invite)\/[A-Za-z0-9-]{2,32}\/?$/i.test(s),
+      "Invalid Discord invite link (e.g. https://discord.gg/abc123)",
+    )
+    .optional(),
   minAccountAgeDays: z.coerce.number().int().min(0).max(3650).default(0),
   walletType: z.enum(["NONE", "EVM", "SOL"]).default("NONE"),
   winnerRoleId: z.string().optional(),
@@ -225,6 +236,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
   const { imageUrl, winnerRoleId, xPosts: postInputs, chain, ...data } = parsed.data;
+  if (!data.requireMember && data.requiredRoleIds.length) {
+    throw new HttpError(400, "Required roles only work when entrants must be server members.");
+  }
   const winnerCount = data.gtdCount + data.fcfsCount;
   if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
   if (winnerCount > 1000) throw new HttpError(400, "Maximum 1000 allocations in total");
@@ -263,6 +277,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       imageUrl: imageUrl || null,
       winnerRoleId: winnerRoleId || null,
       requireAnyRole: true,
+      inviteUrl: data.inviteUrl || null,
       winnerCount,
       chain,
       hostName: user.username,

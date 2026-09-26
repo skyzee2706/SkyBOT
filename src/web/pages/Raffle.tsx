@@ -93,6 +93,7 @@ export function RafflePage() {
           <div className="flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
             <span>{withAllocations ? `Allocations: ${allocationSummary(raffle)}` : allocationSummary(raffle)}</span>
             {chainLabel(raffle.chain) && <span>Chain: {chainLabel(raffle.chain)}</span>}
+            <span>{raffle.requireMember ? "Members only" : "🌐 Open to non-members"}</span>
             <span>
               {entries.length} entr{entries.length === 1 ? "y" : "ies"}
             </span>

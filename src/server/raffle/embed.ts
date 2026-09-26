@@ -40,6 +40,7 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
     reqs.push(`${raffle.requireAnyRole && raffle.requiredRoleIds.length > 1 ? "Have one of these roles" : "Required role"}: ${roles}`);
   }
   if (raffle.blockedRoleIds.length) reqs.push(`Blocked role: ${raffle.blockedRoleIds.map((id) => `<@&${id}>`).join(", ")}`);
+  if (!raffle.requireMember) reqs.push("🌐 Open to non-members (enter on the web page)");
   if (raffle.minAccountAgeDays) reqs.push(`Discord account age ≥ ${raffle.minAccountAgeDays} days`);
   if (raffle.walletType !== "NONE") reqs.push(`Submit ${raffle.walletType === "EVM" ? "EVM (0x...)" : "Solana"} wallet`);
   if (hasXTasks(raffle)) reqs.push("Connect your X account", ...xTaskLines(raffle));

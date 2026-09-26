@@ -170,6 +170,8 @@ publicRouter.get("/raffles/:id", async (req, res) => {
       walletType: raffle.walletType,
       minAccountAgeDays: raffle.minAccountAgeDays,
       requireAnyRole: raffle.requireAnyRole,
+      requireMember: raffle.requireMember,
+      inviteUrl: raffle.inviteUrl,
       requiredRoles: raffle.requiredRoleIds.map((id) => ({ id, ...(guild?.roles.get(id) ?? { name: "deleted-role", color: 0 }) })),
       quoteCount: quotePosts(raffle).length,
       hasXTasks: hasXTasks(raffle),
@@ -201,9 +203,10 @@ async function viewerState(raffle: Raffle, userId: string) {
       ? { status: entry.status, allocation: entry.allocation, wallet: entry.wallet, xUsername: entry.xUsername, note: entry.note }
       : null,
     isMember: raffle.status === "ACTIVE" ? !!member : null,
-    requirementErrors: member
-      ? checkRequirements(raffle, { userId, roleIds: member.roles }).map((e) => plainText(e, guild))
-      : [],
+    requirementErrors:
+      member || !raffle.requireMember
+        ? checkRequirements(raffle, { userId, roleIds: member?.roles ?? [] }).map((e) => plainText(e, guild))
+        : [],
     xUsername: xLink?.xUsername ?? null,
     connectXUrl: hasXTasks(raffle) ? connectXUrl(userId, returnTo) : null,
     tasks: xTaskList(raffle).map((t) => ({
@@ -228,13 +231,16 @@ publicRouter.post("/raffles/:id/enter", async (req, res) => {
 
   const member = await fetchMember(raffle.guildId, user.id);
   const guild = await guildInfo(raffle.guildId);
-  if (!member) {
+  if (!member && raffle.requireMember) {
     throw new HttpError(403, `Join ${guild?.name ?? "the Discord server"} first, then try again.`);
   }
-  // Logika yang sama dengan tombol Enter / Done di Discord (syarat, task X, wallet, quote, anti-duplikat)
+  // Logika yang sama dengan tombol Enter / Done di Discord (syarat, task X, wallet, quote, anti-duplikat).
+  // Non-member (hanya kalau raffle mengizinkan): data diambil dari akun Discord yang login, tanpa role.
   const reply = await enterRaffle(
     raffle.id,
-    { userId: user.id, username: member.user.username, roleIds: member.roles, avatar: member.user.avatar },
+    member
+      ? { userId: user.id, username: member.user.username, roleIds: member.roles, avatar: member.user.avatar }
+      : { userId: user.id, username: user.username, roleIds: [], avatar: user.avatar },
     input.data,
   );
   const entered = !!(await db.entry.findUnique({ where: { raffleId_userId: { raffleId: raffle.id, userId: user.id } } }));
