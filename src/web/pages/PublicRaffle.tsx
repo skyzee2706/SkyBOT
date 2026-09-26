@@ -120,7 +120,7 @@ export function PublicRafflePage() {
   const active = r.status === "ACTIVE";
   // Kembali ke halaman sebelumnya kalau datang dari dalam web; kalau dibuka langsung (mis. dari Discord), ke daftar raffle
   const cameFromApp = (window.history.state?.idx ?? 0) > 0;
-  const listPath = r.status === "ENDED" ? "/raffles?tab=ended" : "/raffles";
+  const listPath = "/raffles";
 
   return (
     <>

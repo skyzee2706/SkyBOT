@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { Globe, Search, SlidersHorizontal, Ticket, Users, X } from "lucide-react";
 import { api, setPageTitle } from "../api";
-import { ErrorBox, formatDate, Loading } from "../components";
+import { ErrorBox, formatDate, Loading, Pagination } from "../components";
 import { CHAIN_IDS, CHAINS } from "../../shared/raffle";
 
 export type RaffleCardData = {
@@ -21,8 +21,7 @@ export type RaffleCardData = {
   entryCount: number;
   guild: { name: string | null; icon: string | null };
 };
-type ListResponse = { total: number; pageSize: number; raffles: RaffleCardData[] };
-type Tab = "live" | "ended";
+type ListResponse = { total: number; page: number; totalPages: number; raffles: RaffleCardData[] };
 
 export function timeLeft(iso: string, now: number) {
   const s = Math.max(0, Math.floor((new Date(iso).getTime() - now) / 1000));
@@ -33,47 +32,41 @@ export function timeLeft(iso: string, now: number) {
   return `${s}s`;
 }
 
-const SORTS: Record<Tab, { value: string; label: string }[]> = {
-  live: [
-    { value: "ending", label: "Ending soon" },
-    { value: "newest", label: "Newest" },
-    { value: "popular", label: "Most entries" },
-    { value: "odds", label: "Best odds" },
-  ],
-  ended: [
-    { value: "newest", label: "Recently ended" },
-    { value: "popular", label: "Most entries" },
-  ],
-};
+const SORTS = [
+  { value: "ending", label: "Ending soon" },
+  { value: "newest", label: "Newest" },
+  { value: "popular", label: "Most entries" },
+  { value: "odds", label: "Best odds" },
+];
 
-// Daftar raffle publik dari semua server, dengan filter untuk pemburu WL.
-// Semua filter disimpan di URL supaya hasil pencarian bisa dibagikan.
+// Daftar raffle yang sedang live dari semua server, dengan filter untuk pemburu WL.
+// 10 per halaman; semua filter & nomor halaman disimpan di URL supaya bisa dibagikan.
 export function RafflesListPage() {
   const [params, setParams] = useSearchParams();
-  const tab: Tab = params.get("tab") === "ended" ? "ended" : "live";
   const chain = params.get("chain") ?? "";
   const open = params.get("open") === "1";
   const alloc = params.get("alloc") ?? "";
-  const sort = SORTS[tab].some((s) => s.value === params.get("sort")) ? params.get("sort")! : SORTS[tab][0].value;
+  const sort = SORTS.some((s) => s.value === params.get("sort")) ? params.get("sort")! : SORTS[0].value;
   const q = params.get("q") ?? "";
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
   const [search, setSearch] = useState(q);
+  const [data, setData] = useState<ListResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [now, setNow] = useState(Date.now());
+
   useEffect(() => {
     setPageTitle("Raffles");
     return () => setPageTitle();
   }, []);
-  const [items, setItems] = useState<RaffleCardData[] | null>(null);
-  const [total, setTotal] = useState(0);
-  const [page, setPage] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [now, setNow] = useState(Date.now());
 
+  // Ganti filter → kembali ke halaman 1
   const update = useCallback(
     (patch: Record<string, string>) => {
       const next = new URLSearchParams(params);
       for (const [k, v] of Object.entries(patch)) (v ? next.set(k, v) : next.delete(k));
-      setParams(next, { replace: true });
+      if (!("page" in patch)) next.delete("page");
+      setParams(next, { replace: !("page" in patch) });
     },
     [params, setParams],
   );
@@ -86,39 +79,36 @@ export function RafflesListPage() {
   }, [search, q, update]);
 
   const query = new URLSearchParams({
-    status: tab,
     sort,
+    page: String(page),
     ...(q && { q }),
     ...(chain && { chain }),
     ...(open && { open: "1" }),
     ...(alloc && { alloc }),
   }).toString();
-  const load = useCallback(
-    (p: number) =>
-      api<ListResponse>(`/p/raffles?${query}&page=${p}`).then((d) => {
-        setTotal(d.total);
-        setItems((prev) => (p === 0 ? d.raffles : [...(prev ?? []), ...d.raffles]));
-        setPage(p);
-      }),
-    [query],
-  );
 
   useEffect(() => {
-    setItems(null);
     setError(null);
-    load(0).catch((e) => setError(e.message));
-  }, [load]);
+    api<ListResponse>(`/p/raffles?${query}`)
+      .then((d) => {
+        setData(d);
+        // Halaman di luar jangkauan (mis. setelah filter) → ke halaman terakhir
+        if (d.total > 0 && page > d.totalPages) update({ page: String(d.totalPages) });
+      })
+      .catch((e) => setError(e.message));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [query]);
   useEffect(() => {
     const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, []);
 
-  const more = async () => {
-    setLoadingMore(true);
-    await load(page + 1).catch((e) => setError(e.message));
-    setLoadingMore(false);
+  const goTo = (p: number) => {
+    update({ page: p === 1 ? "" : String(p) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
+  const items = data?.raffles;
   const filtered = !!(q || chain || open || alloc);
   const pill = (active: boolean) =>
     `inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-sm transition ${
@@ -129,29 +119,12 @@ export function RafflesListPage() {
 
   return (
     <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold">Find your next allowlist</h1>
-      </div>
-
-      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex gap-1">
-          {(["live", "ended"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => update({ tab: t === "live" ? "" : t, sort: "" })}
-              className={`rounded-lg px-4 py-1.5 text-sm ${
-                tab === t ? "bg-brand-500/15 text-brand-200 ring-1 ring-brand-500/30" : "text-zinc-400 hover:text-zinc-200"
-              }`}
-            >
-              {t === "live" ? (
-                <span className="inline-flex items-center gap-2">
-                  <span className="h-2 w-2 rounded-full bg-emerald-400" /> Live
-                </span>
-              ) : (
-                "Ended"
-              )}
-            </button>
-          ))}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-bold">Find your next allowlist</h1>
+          <div className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-400">
+            <span className="h-2 w-2 rounded-full bg-emerald-400" /> Live raffles
+          </div>
         </div>
         <div className="relative sm:w-72">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
@@ -192,10 +165,10 @@ export function RafflesListPage() {
         <select
           className={`${pill(false)} cursor-pointer bg-zinc-950 outline-none sm:ml-auto`}
           value={sort}
-          onChange={(e) => update({ sort: e.target.value === SORTS[tab][0].value ? "" : e.target.value })}
+          onChange={(e) => update({ sort: e.target.value === SORTS[0].value ? "" : e.target.value })}
           aria-label="Sort"
         >
-          {SORTS[tab].map((s) => (
+          {SORTS.map((s) => (
             <option key={s.value} value={s.value}>
               Sort: {s.label}
             </option>
@@ -215,18 +188,17 @@ export function RafflesListPage() {
       </div>
 
       <ErrorBox error={error} />
-      {!items && !error && <Loading />}
-      {items?.length === 0 && (
+      {!data && !error && <Loading />}
+      {data?.total === 0 && (
         <div className="card py-12 text-center">
           <Ticket className="mx-auto h-10 w-10 text-zinc-600" strokeWidth={1.5} />
-          <p className="mt-3 text-zinc-400">
-            {filtered ? "No raffles match your filters." : tab === "live" ? "No live raffles right now." : "No ended raffles yet."}
-          </p>
+          <p className="mt-3 text-zinc-400">{filtered ? "No live raffles match your filters." : "No live raffles right now."}</p>
         </div>
       )}
-      {items && items.length > 0 && (
+      {data && data.total > 0 && (
         <p className="mb-3 text-xs text-zinc-500">
-          {total} raffle{total === 1 ? "" : "s"}
+          Showing {(data.page - 1) * 10 + 1}–{Math.min(data.page * 10, data.total)} of {data.total} live raffle
+          {data.total === 1 ? "" : "s"}
         </p>
       )}
 
@@ -234,13 +206,7 @@ export function RafflesListPage() {
         {items?.map((r) => <RaffleCard key={r.id} r={r} now={now} />)}
       </div>
 
-      {items && items.length < total && (
-        <div className="mt-6 text-center">
-          <button className="btn btn-ghost" onClick={more} disabled={loadingMore}>
-            {loadingMore ? "Loading..." : "Load more"}
-          </button>
-        </div>
-      )}
+      {data && <Pagination page={data.page} totalPages={data.totalPages} onChange={goTo} />}
     </div>
   );
 }

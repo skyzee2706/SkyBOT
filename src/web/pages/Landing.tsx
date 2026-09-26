@@ -99,7 +99,7 @@ export function LandingPage() {
 
   useEffect(() => {
     api<Stats>("/p/stats").then(setStats).catch(() => {});
-    api<{ raffles: RaffleCardData[] }>("/p/raffles?status=live&page=0")
+    api<{ raffles: RaffleCardData[] }>("/p/raffles?page=1")
       .then((d) => setLive(d.raffles.slice(0, 3)))
       .catch(() => {});
     const t = setInterval(() => setNow(Date.now()), 1000);

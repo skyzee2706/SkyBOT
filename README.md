@@ -72,9 +72,9 @@ re-verified against Discord, and the results are announced in the channel, split
 
 ### Web experience
 - Landing page with live platform stats and raffles that are live right now
-- Public **raffle browser** (`/raffles`) with search, chain / GTD / FCFS / open-to-everyone filters and sorting by
-  ending soon, newest, most entries or **best odds**
-- **My Entries** page to track every raffle entered and every spot won
+- Public **live raffle browser** (`/raffles`, 10 per page) with search, chain / GTD / FCFS / open-to-everyone
+  filters and sorting by ending soon, newest, most entries or **best odds**
+- **My Entries** page (10 per page) to track every raffle entered and every spot won, including past raffles
 - **Enter from the browser** with the same rules as Discord
 - Public **entrant list** (Discord name and avatar only) with winner badges
 - Countdown timers, invite-link "Join server" flow, and mobile-friendly layout

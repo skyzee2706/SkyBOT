@@ -54,7 +54,7 @@ async function loadRaffle(req: Request) {
 
 export const publicRouter = Router();
 
-const PAGE_SIZE = 24;
+const PAGE_SIZE = 10;
 
 // Angka ringkas untuk landing page (tanpa data pribadi), di-cache 1 menit
 let statsCache: { at: number; data: unknown } | null = null;
@@ -77,8 +77,7 @@ const guildIconUrl = (id: string, icon: string | null) => (icon ? `https://cdn.d
 // Daftar raffle publik: ?status=live (sedang berjalan, yang paling cepat berakhir dulu) atau ended (terbaru dulu).
 // Raffle yang dibatalkan tidak ditampilkan.
 const listQuery = z.object({
-  status: z.enum(["live", "ended"]).catch("live"),
-  page: z.coerce.number().int().min(0).max(1000).catch(0),
+  page: z.coerce.number().int().min(1).max(10_000).catch(1), // mulai dari 1
   q: z.string().trim().max(80).catch(""),
   chain: z.string().max(40).catch(""), // ID chain dari daftar, atau "OTHER" untuk chain manual
   open: z.enum(["1", ""]).catch(""), // 1 = hanya raffle yang tidak wajib join server
@@ -86,14 +85,14 @@ const listQuery = z.object({
   sort: z.enum(["ending", "newest", "popular", "odds", ""]).catch(""),
 });
 
-// Daftar raffle publik dengan filter untuk pemburu WL. Raffle yang dibatalkan tidak ditampilkan.
+// Daftar raffle yang sedang live, dengan filter untuk pemburu WL (10 per halaman).
+// Raffle yang sudah selesai tidak ditampilkan di sini; riwayat peserta ada di "My entries".
 publicRouter.get("/raffles", async (req, res) => {
   const f = listQuery.parse(req.query);
-  const live = f.status === "live";
-  const sort = f.sort || (live ? "ending" : "newest");
-  const now = new Date();
+  const sort = f.sort || "ending";
   const where: Prisma.RaffleWhereInput = {
-    ...(live ? { status: "ACTIVE", endsAt: { gt: now } } : { status: "ENDED" }),
+    status: "ACTIVE",
+    endsAt: { gt: new Date() },
     ...(f.q
       ? { OR: [{ title: { contains: f.q, mode: "insensitive" } }, { guildName: { contains: f.q, mode: "insensitive" } }] }
       : {}),
@@ -106,6 +105,7 @@ publicRouter.get("/raffles", async (req, res) => {
     ...(f.alloc === "gtd" ? { gtdCount: { gt: 0 } } : f.alloc === "fcfs" ? { fcfsCount: { gt: 0 } } : {}),
   };
   const include = { _count: { select: { entries: true } } } as const;
+  const skip = (f.page - 1) * PAGE_SIZE;
 
   let raffles: (Raffle & { _count: { entries: number } })[];
   let total: number;
@@ -115,24 +115,22 @@ publicRouter.get("/raffles", async (req, res) => {
     const odds = (r: (typeof all)[number]) => r.winnerCount / Math.max(1, r._count.entries);
     all.sort((a, b) => odds(b) - odds(a));
     total = all.length;
-    raffles = all.slice(f.page * PAGE_SIZE, (f.page + 1) * PAGE_SIZE);
+    raffles = all.slice(skip, skip + PAGE_SIZE);
   } else {
     const orderBy: Prisma.RaffleOrderByWithRelationInput[] =
       sort === "popular"
         ? [{ entries: { _count: "desc" } }, { endsAt: "asc" }]
         : sort === "newest"
-          ? live
-            ? [{ createdAt: "desc" }]
-            : [{ endedAt: "desc" }]
-          : [{ endsAt: live ? "asc" : "desc" }];
+          ? [{ createdAt: "desc" }]
+          : [{ endsAt: "asc" }];
     [raffles, total] = await Promise.all([
-      db.raffle.findMany({ where, orderBy, skip: f.page * PAGE_SIZE, take: PAGE_SIZE, include }),
+      db.raffle.findMany({ where, orderBy, skip, take: PAGE_SIZE, include }),
       db.raffle.count({ where }),
     ]);
   }
 
   const cards = await toCards(raffles);
-  res.json({ total, pageSize: PAGE_SIZE, raffles: cards });
+  res.json({ total, page: f.page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)), raffles: cards });
 });
 
 // Data kartu raffle (daftar publik & "My entries")
