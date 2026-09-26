@@ -19,7 +19,7 @@ import {
   UserRoundX,
   type LucideIcon,
 } from "lucide-react";
-import { api, loginUrl } from "../api";
+import { api, loginUrl, setPageTitle } from "../api";
 import { ErrorBox, formatDate, Loading, roleColor, StatusBadge } from "../components";
 import { timeLeft } from "./RafflesList";
 
@@ -36,6 +36,7 @@ type PublicRaffle = {
     hostAvatar: string | null;
     chain: string | null;
     allocations: string;
+    spots: number;
     walletType: "NONE" | "EVM" | "SOL";
     minAccountAgeDays: number;
     requireAnyRole: boolean;
@@ -86,6 +87,10 @@ export function PublicRafflePage() {
   }, [id]);
 
   useEffect(load, [load]);
+  useEffect(() => {
+    if (data) setPageTitle(data.raffle.title);
+    return () => setPageTitle();
+  }, [data?.raffle.title]);
   // Setelah membuka task X / Connect X di tab lain, status diperbarui saat peserta kembali ke tab ini
   useEffect(() => {
     const onFocus = () => document.visibilityState === "visible" && load();
@@ -153,7 +158,17 @@ export function PublicRafflePage() {
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Info label="Allocations" value={r.allocations} />
             <Info label="Chain" value={r.chain ?? "—"} />
-            <Info label="Entries" value={String(r.entryCount)} />
+            <Info
+              label="Entries"
+              value={String(r.entryCount)}
+              sub={
+                active && r.spots > 0
+                  ? r.entryCount <= r.spots
+                    ? "Every entry wins so far"
+                    : `~1 in ${(r.entryCount / r.spots).toFixed(r.entryCount / r.spots < 10 ? 1 : 0)} odds`
+                  : undefined
+              }
+            />
             <Info
               label={active ? "Ends in" : "Ended"}
               value={active ? timeLeft(r.endsAt, now) : formatDate(r.endedAt ?? r.endsAt)}

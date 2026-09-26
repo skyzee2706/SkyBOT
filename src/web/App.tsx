@@ -10,6 +10,7 @@ import { AdminPage } from "./pages/Admin";
 import { PublicRafflePage } from "./pages/PublicRaffle";
 import { RafflesListPage } from "./pages/RafflesList";
 import { LandingPage } from "./pages/Landing";
+import { MyEntriesPage } from "./pages/MyEntries";
 import { ChevronDown } from "lucide-react";
 import { LogoMark } from "./Logo";
 
@@ -29,7 +30,11 @@ export function App() {
 
   if (isAdmin) return <AdminPage />;
 
-  const auth = (el: ReactNode) => <RequireLogin me={me}>{el}</RequireLogin>;
+  const auth = (el: ReactNode, kind: LoginKind = "create") => (
+    <RequireLogin me={me} kind={kind}>
+      {el}
+    </RequireLogin>
+  );
   return (
     <div className="flex min-h-screen flex-col">
       <Header me={me} onLogout={() => setMe(null)} />
@@ -37,6 +42,7 @@ export function App() {
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/raffles" element={<RafflesListPage />} />
+          <Route path="/entries" element={auth(<MyEntriesPage />, "entries")} />
           <Route path="/raffle/:id" element={<PublicRafflePage />} />
           <Route path="/create" element={auth(<GuildsPage />)} />
           {/* Link lama /manage tetap jalan */}
@@ -90,6 +96,10 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
           <NavLink to="/raffles" className={({ isActive }) => nav({ isActive: isActive || pathname.startsWith("/raffle/") })}>
             Raffles
           </NavLink>
+          {/* Di layar kecil "My Entries" ada di menu akun */}
+          <NavLink to="/entries" className={(s) => `${nav(s)} hidden sm:inline`}>
+            My Entries
+          </NavLink>
           <NavLink to="/create" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
             Create Raffle
           </NavLink>
@@ -109,6 +119,9 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
             </button>
             {open && (
               <div className="absolute right-0 z-30 mt-1 w-44 rounded-lg border border-zinc-700 bg-zinc-900 p-1 shadow-xl">
+                <Link to="/entries" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
+                  My entries
+                </Link>
                 <Link to="/create" onClick={() => setOpen(false)} className="block rounded-md px-3 py-2 text-sm hover:bg-zinc-800">
                   My servers
                 </Link>
@@ -129,17 +142,27 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
 }
 
 // Halaman kelola: minta login dulu, lalu kembali ke halaman yang sama
-function RequireLogin({ me, children }: { me: Me | null | undefined; children: ReactNode }) {
+type LoginKind = "create" | "entries";
+const LOGIN_COPY: Record<LoginKind, { title: string; text: string }> = {
+  create: {
+    title: "Log in to create raffles",
+    text: "Log in with Discord to create and manage raffles for servers where you're an admin or have a raffle manager role.",
+  },
+  entries: {
+    title: "Log in to see your entries",
+    text: "Log in with Discord to track every raffle you've entered and see which allowlist spots you've won.",
+  },
+};
+
+function RequireLogin({ me, kind, children }: { me: Me | null | undefined; kind: LoginKind; children: ReactNode }) {
   const { pathname } = useLocation();
   if (me === undefined) return <div className="py-10 text-center text-zinc-500">Loading...</div>;
   if (me) return <>{children}</>;
   return (
     <div className="card mx-auto mt-6 max-w-md space-y-4 text-center">
       <LogoMark className="mx-auto h-12 w-12" />
-      <h1 className="text-xl font-semibold">Log in to create raffles</h1>
-      <p className="text-sm text-zinc-400">
-        Log in with Discord to create and manage raffles for servers where you're an admin or have a raffle manager role.
-      </p>
+      <h1 className="text-xl font-semibold">{LOGIN_COPY[kind].title}</h1>
+      <p className="text-sm text-zinc-400">{LOGIN_COPY[kind].text}</p>
       <a href={loginUrl(pathname)} className="btn btn-primary w-full py-3">
         Log in with Discord
       </a>

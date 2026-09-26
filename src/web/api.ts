@@ -94,3 +94,8 @@ export const avatarUrl = (u: Me) =>
 
 // Login Discord lalu kembali ke halaman ini
 export const loginUrl = (returnTo: string) => `/api/auth/login?next=${encodeURIComponent(returnTo)}`;
+
+// Judul tab browser per halaman
+export const setPageTitle = (title?: string) => {
+  document.title = title ? `${title} · SkyBOT Raffle` : "SkyBOT Raffle · Find allowlist spots, run fair raffles";
+};

@@ -1,6 +1,6 @@
 import { Router, type Request } from "express";
 import { Routes, type APIGuild } from "discord.js";
-import type { Raffle } from "@prisma/client";
+import type { Prisma, Raffle } from "@prisma/client";
 import { z } from "zod";
 import { db } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
@@ -8,7 +8,7 @@ import { connectXUrl, taskClickUrl } from "../x.js";
 import { endRaffle, enterRaffle, type Reply } from "../raffle/service.js";
 import { checkRequirements } from "../raffle/requirements.js";
 import { hasXTasks, quotePosts, xTaskList } from "../raffle/xtasks.js";
-import { allocationSummary, chainLabel, discordAvatarUrl, publicRafflePath } from "../../shared/raffle.js";
+import { allocationSummary, CHAIN_IDS, chainLabel, discordAvatarUrl, isChainId, publicRafflePath } from "../../shared/raffle.js";
 import { currentUser } from "./auth.js";
 import { canManageGuild, HttpError } from "./dashboard.js";
 
@@ -76,22 +76,67 @@ const guildIconUrl = (id: string, icon: string | null) => (icon ? `https://cdn.d
 
 // Daftar raffle publik: ?status=live (sedang berjalan, yang paling cepat berakhir dulu) atau ended (terbaru dulu).
 // Raffle yang dibatalkan tidak ditampilkan.
-publicRouter.get("/raffles", async (req, res) => {
-  const live = req.query.status !== "ended";
-  const page = Math.max(0, Math.min(1000, Number(req.query.page) || 0));
-  const now = new Date();
-  const where = live ? { status: "ACTIVE" as const, endsAt: { gt: now } } : { status: "ENDED" as const };
-  const [raffles, total] = await Promise.all([
-    db.raffle.findMany({
-      where,
-      orderBy: live ? { endsAt: "asc" } : { endedAt: "desc" },
-      skip: page * PAGE_SIZE,
-      take: PAGE_SIZE,
-      include: { _count: { select: { entries: true } } },
-    }),
-    db.raffle.count({ where }),
-  ]);
+const listQuery = z.object({
+  status: z.enum(["live", "ended"]).catch("live"),
+  page: z.coerce.number().int().min(0).max(1000).catch(0),
+  q: z.string().trim().max(80).catch(""),
+  chain: z.string().max(40).catch(""), // ID chain dari daftar, atau "OTHER" untuk chain manual
+  open: z.enum(["1", ""]).catch(""), // 1 = hanya raffle yang tidak wajib join server
+  alloc: z.enum(["gtd", "fcfs", ""]).catch(""),
+  sort: z.enum(["ending", "newest", "popular", "odds", ""]).catch(""),
+});
 
+// Daftar raffle publik dengan filter untuk pemburu WL. Raffle yang dibatalkan tidak ditampilkan.
+publicRouter.get("/raffles", async (req, res) => {
+  const f = listQuery.parse(req.query);
+  const live = f.status === "live";
+  const sort = f.sort || (live ? "ending" : "newest");
+  const now = new Date();
+  const where: Prisma.RaffleWhereInput = {
+    ...(live ? { status: "ACTIVE", endsAt: { gt: now } } : { status: "ENDED" }),
+    ...(f.q
+      ? { OR: [{ title: { contains: f.q, mode: "insensitive" } }, { guildName: { contains: f.q, mode: "insensitive" } }] }
+      : {}),
+    ...(f.chain === "OTHER"
+      ? { chain: { notIn: CHAIN_IDS }, NOT: { chain: null } }
+      : isChainId(f.chain)
+        ? { chain: f.chain }
+        : {}),
+    ...(f.open ? { requireMember: false } : {}),
+    ...(f.alloc === "gtd" ? { gtdCount: { gt: 0 } } : f.alloc === "fcfs" ? { fcfsCount: { gt: 0 } } : {}),
+  };
+  const include = { _count: { select: { entries: true } } } as const;
+
+  let raffles: (Raffle & { _count: { entries: number } })[];
+  let total: number;
+  if (sort === "odds") {
+    // Peluang terbaik = jumlah spot dibanding jumlah peserta; dihitung di memori (maks 1000 raffle)
+    const all = await db.raffle.findMany({ where, include, take: 1000, orderBy: { endsAt: "asc" } });
+    const odds = (r: (typeof all)[number]) => r.winnerCount / Math.max(1, r._count.entries);
+    all.sort((a, b) => odds(b) - odds(a));
+    total = all.length;
+    raffles = all.slice(f.page * PAGE_SIZE, (f.page + 1) * PAGE_SIZE);
+  } else {
+    const orderBy: Prisma.RaffleOrderByWithRelationInput[] =
+      sort === "popular"
+        ? [{ entries: { _count: "desc" } }, { endsAt: "asc" }]
+        : sort === "newest"
+          ? live
+            ? [{ createdAt: "desc" }]
+            : [{ endedAt: "desc" }]
+          : [{ endsAt: live ? "asc" : "desc" }];
+    [raffles, total] = await Promise.all([
+      db.raffle.findMany({ where, orderBy, skip: f.page * PAGE_SIZE, take: PAGE_SIZE, include }),
+      db.raffle.count({ where }),
+    ]);
+  }
+
+  const cards = await toCards(raffles);
+  res.json({ total, pageSize: PAGE_SIZE, raffles: cards });
+});
+
+// Data kartu raffle (daftar publik & "My entries")
+async function toCards(raffles: (Raffle & { _count: { entries: number } })[]) {
   // Raffle lama belum menyimpan nama server: ambil sekali dari Discord lalu simpan
   const missing = [...new Set(raffles.filter((r) => !r.guildName).map((r) => r.guildId))];
   const fetched = new Map<string, GuildInfo | null>();
@@ -102,28 +147,54 @@ publicRouter.get("/raffles", async (req, res) => {
       if (info) await db.raffle.updateMany({ where: { guildId: id, guildName: null }, data: { guildName: info.name, guildIcon: info.icon } });
     }),
   );
+  return raffles.map((r) => {
+    const name = r.guildName ?? fetched.get(r.guildId)?.name ?? null;
+    const icon = r.guildName ? r.guildIcon : (fetched.get(r.guildId)?.icon ?? null);
+    return {
+      id: r.id,
+      title: r.title,
+      imageUrl: r.imageUrl,
+      status: r.status,
+      endsAt: r.endsAt,
+      endedAt: r.endedAt,
+      hostName: r.hostName,
+      hostAvatar: r.hostAvatar,
+      chain: chainLabel(r.chain),
+      allocations: allocationSummary(r),
+      spots: r.winnerCount,
+      requireMember: r.requireMember,
+      entryCount: r._count.entries,
+      guild: { name, icon: guildIconUrl(r.guildId, icon) },
+    };
+  });
+}
 
+// Raffle yang pernah diikuti user yang login, beserta hasilnya
+publicRouter.get("/me/entries", async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Log in with Discord to see your entries.");
+  const page = Math.max(0, Math.min(1000, Number(req.query.page) || 0));
+  const size = 30;
+  const [entries, total] = await Promise.all([
+    db.entry.findMany({
+      where: { userId: user.id },
+      orderBy: { createdAt: "desc" },
+      skip: page * size,
+      take: size,
+      include: { raffle: { include: { _count: { select: { entries: true } } } } },
+    }),
+    db.entry.count({ where: { userId: user.id } }),
+  ]);
+  const cards = await toCards(entries.map((e) => e.raffle));
   res.json({
     total,
-    pageSize: PAGE_SIZE,
-    raffles: raffles.map((r) => {
-      const name = r.guildName ?? fetched.get(r.guildId)?.name ?? null;
-      const icon = r.guildName ? r.guildIcon : (fetched.get(r.guildId)?.icon ?? null);
-      return {
-        id: r.id,
-        title: r.title,
-        imageUrl: r.imageUrl,
-        status: r.status,
-        endsAt: r.endsAt,
-        endedAt: r.endedAt,
-        hostName: r.hostName,
-        hostAvatar: r.hostAvatar,
-        chain: chainLabel(r.chain),
-        allocations: allocationSummary(r),
-        entryCount: r._count.entries,
-        guild: { name, icon: guildIconUrl(r.guildId, icon) },
-      };
-    }),
+    hasMore: (page + 1) * size < total,
+    entries: entries.map((e, i) => ({
+      enteredAt: e.createdAt,
+      status: e.status,
+      allocation: e.allocation,
+      raffle: cards[i],
+    })),
   });
 });
 
@@ -184,6 +255,7 @@ publicRouter.get("/raffles/:id", async (req, res) => {
       hostAvatar: raffle.hostAvatar,
       chain: chainLabel(raffle.chain),
       allocations: allocationSummary(raffle),
+      spots: raffle.winnerCount,
       walletType: raffle.walletType,
       minAccountAgeDays: raffle.minAccountAgeDays,
       requireAnyRole: raffle.requireAnyRole,

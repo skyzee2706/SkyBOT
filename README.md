@@ -4,9 +4,9 @@
 
 # SkyBOT Raffle
 
-**Discord raffles with a real web experience.**<br/>
-Create allowlist raffles on the web, post them to Discord automatically, let members enter from Discord or the browser,
-and draw fair GTD / FCFS winners the moment a raffle ends.
+**Find allowlist spots. Run fair raffles.**<br/>
+A raffle platform for NFT collectors hunting GTD and FCFS spots, and for the Web3 communities that host them.
+Enter from Discord or the web, and get fair winners the moment a raffle ends.
 
 [**Open SkyBOT Raffle**](https://skybot-raffle.vercel.app) · [Features](#features) · [How it works](#how-it-works) · [Deployment](#deployment) · [License](#license)
 
@@ -28,9 +28,15 @@ and draw fair GTD / FCFS winners the moment a raffle ends.
 
 ## Overview
 
-SkyBOT Raffle is a raffle platform for Web3 and Discord communities. Community managers create a raffle once on the
-web dashboard; the bot publishes it to a Discord channel and keeps it updated. Members can enter with a single click in
-Discord, or through the public raffle page on the web, and every entry goes through the same requirement checks.
+SkyBOT Raffle serves two audiences:
+
+- **Collectors** browse live raffles from every community in one place, filter by chain, allocation type or raffles
+  that are open to everyone, enter on the web (no Discord join needed when the host allows it), and track every entry
+  and win on their **My Entries** page.
+- **Communities** create a raffle once on the web dashboard; the bot publishes it to Discord and keeps it updated,
+  while a public raffle page brings in collectors from outside the server.
+
+Every entry, from Discord or the web, goes through the same requirement checks.
 
 When the timer runs out, winners are drawn with a cryptographically secure random generator, requirements are
 re-verified against Discord, and the results are announced in the channel, split by allocation type.
@@ -66,7 +72,9 @@ re-verified against Discord, and the results are announced in the channel, split
 
 ### Web experience
 - Landing page with live platform stats and raffles that are live right now
-- Public **raffle browser** (`/raffles`) with Live and Ended tabs, no login required to browse
+- Public **raffle browser** (`/raffles`) with search, chain / GTD / FCFS / open-to-everyone filters and sorting by
+  ending soon, newest, most entries or **best odds**
+- **My Entries** page to track every raffle entered and every spot won
 - **Enter from the browser** with the same rules as Discord
 - Public **entrant list** (Discord name and avatar only) with winner badges
 - Countdown timers, invite-link "Join server" flow, and mobile-friendly layout

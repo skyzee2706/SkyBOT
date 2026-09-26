@@ -3,6 +3,9 @@ import { Link } from "react-router-dom";
 import {
   ArrowRight,
   AtSign,
+  Check,
+  Search,
+  Users,
   Dices,
   FileSpreadsheet,
   Globe,
@@ -51,9 +54,38 @@ const FEATURES: { icon: LucideIcon; title: string; text: string }[] = [
   },
 ];
 
+const AUDIENCES: { icon: LucideIcon; eyebrow: string; title: string; points: string[]; cta: string; to: string }[] = [
+  {
+    icon: Search,
+    eyebrow: "For collectors",
+    title: "Hunt allowlist spots in one place",
+    points: [
+      "Browse live raffles from every community on SkyBOT",
+      "Filter by chain, GTD or FCFS, and raffles open to everyone",
+      "Enter on the web, no Discord server join needed when the raffle allows it",
+      "Track every entry and win on your My Entries page",
+    ],
+    cta: "Find WL spots",
+    to: "/raffles",
+  },
+  {
+    icon: Users,
+    eyebrow: "For communities",
+    title: "Run raffles your members trust",
+    points: [
+      "Create once on the web, the bot posts and updates it in Discord",
+      "GTD and FCFS allocations with roles, wallet and X task requirements",
+      "Reach collectors beyond your server with a public raffle page",
+      "Export winners to Excel, split by allocation",
+    ],
+    cta: "Create a raffle",
+    to: "/create",
+  },
+];
+
 const STEPS: { icon: LucideIcon; title: string; text: string }[] = [
   { icon: PenLine, title: "Create on the web", text: "Set allocations, chain, requirements and X tasks in one form." },
-  { icon: MousePointerClick, title: "Members enter", text: "The bot posts to Discord and a public page goes live instantly." },
+  { icon: MousePointerClick, title: "Collectors enter", text: "From Discord or the public raffle page, with the same rules." },
   { icon: Sparkles, title: "Winners are drawn", text: "Results are announced in Discord and shown on the raffle page." },
 ];
 
@@ -88,21 +120,22 @@ export function LandingPage() {
           className="mx-auto h-24 w-24 rounded-3xl shadow-[0_0_60px_-10px_rgb(242_150_58/0.6)] ring-1 ring-brand-500/40"
         />
         <div className="mx-auto mt-8 inline-flex items-center gap-2 rounded-full border border-brand-500/30 bg-brand-500/10 px-3 py-1 text-xs font-medium text-brand-200">
-          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> Built for Discord & Web3 communities
+          <span className="h-1.5 w-1.5 rounded-full bg-brand-400" /> For NFT collectors and Web3 communities
         </div>
         <h1 className="mx-auto mt-5 max-w-3xl text-4xl font-bold leading-tight tracking-tight sm:text-6xl">
-          Raffles your community{" "}
+          Find allowlist spots.{" "}
+          <br className="hidden sm:block" />
           <span className="bg-gradient-to-r from-brand-300 via-brand-400 to-brand-600 bg-clip-text text-transparent">
-            actually trusts
+            Run fair raffles.
           </span>
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-zinc-400 sm:text-lg">
-          Create allowlist raffles on the web, post them to Discord automatically, and draw fair GTD and FCFS winners the
-          moment the timer ends.
+          Hunt GTD and FCFS spots from NFT projects across every chain, many open to everyone with no Discord join
+          needed. Or run your own raffle for your community in under a minute.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/raffles" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
-            Explore raffles <ArrowRight className="h-4 w-4" />
+            Find WL spots <ArrowRight className="h-4 w-4" />
           </Link>
           <Link to="/create" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
             Create a raffle
@@ -155,6 +188,32 @@ export function LandingPage() {
         </section>
       )}
 
+      {/* Dua jenis pengguna: pemburu WL & komunitas */}
+      <section className="grid gap-4 lg:grid-cols-2">
+        {AUDIENCES.map(({ icon: Icon, eyebrow, title, points, cta, to }) => (
+          <div key={title} className="card relative flex flex-col overflow-hidden p-7">
+            <div aria-hidden="true" className="pointer-events-none absolute -right-16 -top-16 h-48 w-48 rounded-full bg-brand-500/10 blur-2xl" />
+            <div className="flex items-center gap-3">
+              <div className="grid h-11 w-11 place-items-center rounded-xl bg-brand-500/15 text-brand-300 ring-1 ring-brand-500/25">
+                <Icon className="h-5 w-5" />
+              </div>
+              <div className="text-xs font-medium uppercase tracking-widest text-brand-400">{eyebrow}</div>
+            </div>
+            <h2 className="mt-5 text-2xl font-bold">{title}</h2>
+            <ul className="mt-5 flex-1 space-y-3">
+              {points.map((p) => (
+                <li key={p} className="flex gap-3 text-sm text-zinc-300">
+                  <Check className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" /> {p}
+                </li>
+              ))}
+            </ul>
+            <Link to={to} className="btn btn-ghost mt-7 self-start">
+              {cta} <ArrowRight className="h-4 w-4" />
+            </Link>
+          </div>
+        ))}
+      </section>
+
       {/* Fitur */}
       <section>
         <div className="mx-auto mb-10 max-w-2xl text-center">
@@ -195,16 +254,17 @@ export function LandingPage() {
       {/* Ajakan akhir */}
       <section className="relative overflow-hidden rounded-3xl border border-brand-500/30 bg-gradient-to-br from-brand-500/20 via-zinc-900 to-zinc-900 px-6 py-12 text-center sm:px-12">
         <div aria-hidden="true" className="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full bg-brand-500/20 blur-3xl" />
-        <h2 className="text-2xl font-bold sm:text-3xl">Ready to run your next raffle?</h2>
+        <h2 className="text-2xl font-bold sm:text-3xl">Your next allowlist is one click away</h2>
         <p className="mx-auto mt-3 max-w-lg text-zinc-400">
-          Log in with Discord, pick your server and have a raffle live in under a minute.
+          Collectors: find a raffle and enter in seconds. Communities: log in with Discord and have a raffle live in under a
+          minute.
         </p>
         <div className="mt-7 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Link to="/create" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
-            Create a raffle <ArrowRight className="h-4 w-4" />
+          <Link to="/raffles" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
+            Find WL spots <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link to="/raffles" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
-            Browse raffles
+          <Link to="/create" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
+            Create a raffle
           </Link>
         </div>
       </section>

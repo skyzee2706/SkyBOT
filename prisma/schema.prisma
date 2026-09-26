@@ -139,6 +139,7 @@ model Entry {
   @@unique([raffleId, userId])
   @@unique([raffleId, wallet])
   @@index([raffleId, status])
+  @@index([userId, createdAt]) // halaman "My entries"
 }
 
 // Akun X yang terhubung ke akun Discord (1 akun X hanya untuk 1 akun Discord)
