@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Check, Copy, Heart } from "lucide-react";
 import { LogoMark } from "./Logo";
-import { XLogo } from "./Profile";
 
 export const CREATOR = {
   handle: "SkyzeeReal",
@@ -116,14 +115,7 @@ const FOOTER_LINKS: { title: string; links: { label: string; to: string }[] }[] 
     links: [
       { label: "Live raffles", to: "/raffles" },
       { label: "Ended raffles", to: "/raffles?status=ended" },
-      { label: "My entries", to: "/entries" },
-    ],
-  },
-  {
-    title: "Communities",
-    links: [
       { label: "Dashboard", to: "/manage" },
-      { label: "Create a raffle", to: "/manage" },
     ],
   },
   {
@@ -135,40 +127,45 @@ const FOOTER_LINKS: { title: string; links: { label: string; to: string }[] }[] 
   },
 ];
 
-export function Footer() {
+// Baris "Created by" + Donate (dipakai di semua halaman)
+function CreditBar() {
   return (
-    <footer className="mt-12 border-t border-brand-500/15 bg-zinc-950/60">
-      <div className="mx-auto max-w-6xl px-4 py-12">
-        <div className="grid gap-10 lg:grid-cols-5">
-          {/* Brand */}
-          <div className="lg:col-span-2">
+    <div className="flex flex-wrap items-center gap-4">
+      <CreatorCredit />
+      <DonateButton />
+    </div>
+  );
+}
+
+// full = footer lengkap (hanya di landing page); halaman lain cukup Created by + Donate
+export function Footer({ full = false }: { full?: boolean }) {
+  if (!full) {
+    return (
+      <footer className="border-t border-brand-500/15">
+        <div className="mx-auto flex max-w-6xl justify-end px-4 py-4">
+          <CreditBar />
+        </div>
+      </footer>
+    );
+  }
+  return (
+    <footer className="border-t border-brand-500/15">
+      <div className="mx-auto max-w-6xl px-4 pb-6 pt-10">
+        <div className="flex flex-col gap-8 sm:flex-row sm:justify-between">
+          <div className="max-w-xs">
             <Link to="/" className="inline-flex items-center gap-2 font-semibold">
-              <LogoMark className="h-8 w-8" />
+              <LogoMark className="h-7 w-7" />
               <span className="text-brand-50">
                 SkyBOT <span className="text-brand-400">Raffle</span>
               </span>
             </Link>
-            <p className="mt-4 max-w-xs text-sm leading-relaxed text-zinc-400">
-              Allowlist raffles for NFT collectors and the Web3 communities that host them. Fair draws, run from Discord and the
-              web.
-            </p>
-            <a
-              href={CREATOR.url}
-              target="_blank"
-              rel="noreferrer"
-              aria-label="SkyBOT on X"
-              className="mt-5 inline-grid h-9 w-9 place-items-center rounded-lg text-zinc-400 ring-1 ring-zinc-800 transition hover:text-zinc-100 hover:ring-brand-500/50"
-            >
-              <XLogo className="h-4 w-4" />
-            </a>
+            <p className="mt-3 text-sm leading-relaxed text-zinc-500">Fair allowlist raffles for NFT collectors and Web3 communities.</p>
           </div>
-
-          {/* Link: 2 kolom di HP, 3 kolom mulai tablet */}
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-3 lg:col-span-3">
+          <div className="flex gap-16">
             {FOOTER_LINKS.map((group) => (
               <nav key={group.title} aria-label={group.title}>
                 <h3 className="text-xs font-semibold uppercase tracking-widest text-brand-300/80">{group.title}</h3>
-                <ul className="mt-4 space-y-2.5">
+                <ul className="mt-3 space-y-2">
                   {group.links.map((l) => (
                     <li key={l.label}>
                       <Link to={l.to} className="text-sm text-zinc-400 transition hover:text-zinc-100">
@@ -176,18 +173,14 @@ export function Footer() {
                       </Link>
                     </li>
                   ))}
-              </ul>
-            </nav>
-          ))}
+                </ul>
+              </nav>
+            ))}
           </div>
         </div>
-
-        <div className="mt-12 flex flex-col-reverse items-start gap-4 border-t border-zinc-800/80 pt-6 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-8 flex flex-col-reverse gap-4 border-t border-zinc-800/80 pt-5 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs text-zinc-500">© {new Date().getFullYear()} SkyBOT Raffle. All rights reserved.</p>
-          <div className="flex flex-wrap items-center gap-4">
-            <CreatorCredit />
-            <DonateButton />
-          </div>
+          <CreditBar />
         </div>
       </div>
     </footer>

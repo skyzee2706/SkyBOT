@@ -61,7 +61,7 @@ export function App() {
           <Route path="*" element={<p className="text-zinc-400">Page not found.</p>} />
         </Routes>
       </main>
-      <Footer />
+      <Footer full={pathname === "/"} />
     </div>
   );
 }
