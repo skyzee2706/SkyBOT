@@ -4,7 +4,8 @@
   "outputDirectory": "dist/web",
   "functions": {
     "api/index.ts": {
-      "maxDuration": 60
+      "maxDuration": 60,
+      "includeFiles": "dist/web/index.html"
     }
   },
   "headers": [
@@ -35,6 +36,10 @@
     }
   ],
   "rewrites": [
+    {
+      "source": "/raffle/:id",
+      "destination": "/api"
+    },
     {
       "source": "/api/(.*)",
       "destination": "/api"

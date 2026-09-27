@@ -34,5 +34,5 @@ jobs:
           npx prisma db push --skip-generate
           npx tsx scripts/db-migrate.ts post
       - run: npm run typecheck
+      - run: npx vite build # dipakai juga oleh tes preview link (dist/web/index.html)
       - run: npm test
-      - run: npx vite build

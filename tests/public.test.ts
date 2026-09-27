@@ -68,3 +68,29 @@ describe("participant list", () => {
     assert.doesNotMatch(text, /0x0{10}/);
   });
 });
+
+describe("link preview", () => {
+  test("each raffle page has its own title, summary and image", async () => {
+    const r = await makeRaffle({
+      title: "Nebula <Pass>",
+      guildName: "Nebula Labs",
+      gtdCount: 20,
+      fcfsCount: 50,
+      winnerCount: 70,
+      chain: "BASE",
+      imageUrl: "https://skybot.test/api/images/abc",
+      endsAt: new Date("2026-09-30T12:00:00Z"),
+    });
+    const html = await (await fetch(`${server.base}/raffle/${r.id}`)).text();
+    assert.match(html, /<meta property="og:title" content="Nebula &#60;Pass&#62; · Nebula Labs" \/>/);
+    assert.match(html, /<meta property="og:description" content="GTD 20 · FCFS 50 · Base · Ends Sep 30, 2026" \/>/);
+    assert.match(html, /og:image" content="https:\/\/skybot.test\/api\/images\/abc"/);
+    assert.equal(html.match(/property="og:title"/g)?.length, 1, "generic tags replaced, not duplicated");
+    assert.match(html, /<script type="module"/, "the app still loads");
+  });
+
+  test("unknown raffles fall back to the default preview", async () => {
+    const html = await (await fetch(`${server.base}/raffle/does-not-exist`)).text();
+    assert.match(html, /og:image" content="https:\/\/skybot-raffle.vercel.app\/og.png"/);
+  });
+});

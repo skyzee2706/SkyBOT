@@ -8,6 +8,7 @@ import { interactionsRouter } from "./api/interactions.js";
 import { adminRouter } from "./api/admin.js";
 import { publicRouter } from "./api/public.js";
 import { xRouter } from "./api/xauth.js";
+import { ogRouter } from "./api/og.js";
 
 const app = express();
 app.disable("x-powered-by");
@@ -21,6 +22,8 @@ app.use(cookieParser());
 app.use("/api/auth", authRouter);
 app.use("/api/x", xRouter);
 app.get("/api/images/:id", serveImage); // publik, tanpa login (Discord perlu mengambil gambarnya)
+// /raffle/:id diarahkan Vercel ke function ini (lihat vercel.json) supaya tiap raffle punya preview link sendiri
+app.use(ogRouter);
 app.use("/api/p", publicRouter); // halaman raffle publik — login Discord opsional
 app.use("/api/admin", adminRouter); // login pakai PIN, bukan Discord — harus sebelum dashboardRouter
 app.use("/api", dashboardRouter);
