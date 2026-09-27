@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, ApiError } from "../api";
-import { ErrorBox, formatDate, Loading } from "../components";
+import { ErrorBox, formatDate, Loading, Pagination } from "../components";
 import { Lock } from "lucide-react";
 import { LogoMark } from "../Logo";
 
@@ -35,7 +35,7 @@ type Stats = {
     lastLoginAt: string | null;
     rafflesCreated: number;
   }[];
-  recentRaffles: {
+  raffles: {
     id: string;
     title: string;
     guildId: string;
@@ -55,6 +55,8 @@ const userAvatar = (u: { id: string; avatar: string | null }) =>
   u.avatar
     ? `https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64`
     : `https://cdn.discordapp.com/embed/avatars/${Number((BigInt(u.id) >> 22n) % 6n)}.png`;
+
+const ADMIN_PAGE_SIZE = 50;
 
 // Halaman tersembunyi (tidak ada link ke sini). Login pakai PIN, terpisah dari login Discord.
 export function AdminPage() {
@@ -155,6 +157,9 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<"communities" | "users" | "raffles">("communities");
   const [search, setSearch] = useState("");
+  // Tiap tabel 50 baris per halaman; ganti tab / pencarian → kembali ke halaman 1
+  const [page, setPage] = useState(1);
+  useEffect(() => setPage(1), [tab, search]);
 
   const load = useCallback(() => {
     setError(null);
@@ -168,6 +173,14 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
   const t = stats.totals;
   const q = search.trim().toLowerCase();
   const has = (...v: (string | null)[]) => !q || v.some((x) => x?.toLowerCase().includes(q));
+  const rows = {
+    communities: stats.communities.filter((c) => has(c.name, c.id)),
+    users: stats.users.filter((u) => has(u.username, u.id)),
+    raffles: stats.raffles.filter((r) => has(r.title, r.guildName, r.hostName)),
+  };
+  const totalPages = Math.max(1, Math.ceil(rows[tab].length / ADMIN_PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const paged = <T,>(list: T[]) => list.slice((current - 1) * ADMIN_PAGE_SIZE, current * ADMIN_PAGE_SIZE);
 
   return (
     <div className="space-y-6">
@@ -197,7 +210,7 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
               [
                 ["communities", `Communities (${stats.communities.length})`],
                 ["users", `Users (${stats.users.length})`],
-                ["raffles", `Recent raffles (${stats.recentRaffles.length})`],
+                ["raffles", `Raffles (${stats.raffles.length})`],
               ] as const
             ).map(([k, label]) => (
               <button
@@ -225,39 +238,37 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {stats.communities
-                  .filter((c) => has(c.name, c.id))
-                  .map((c) => (
-                    <tr key={c.id}>
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          {guildIcon(c) ? (
-                            <img src={guildIcon(c)!} className="h-7 w-7 rounded-full" alt="" />
-                          ) : (
-                            <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-800 text-xs">
-                              {(c.name ?? "?")[0]}
-                            </div>
-                          )}
-                          <div>
-                            <div>{c.name ?? <span className="text-zinc-500">Unknown server</span>}</div>
-                            <div className="text-xs text-zinc-500">{c.id}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="py-2 pr-4">
-                        {c.botPresent === null ? (
-                          <span className="text-zinc-500">?</span>
-                        ) : c.botPresent ? (
-                          <span className="text-emerald-400">Installed</span>
+                {paged(rows.communities).map((c) => (
+                  <tr key={c.id}>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        {guildIcon(c) ? (
+                          <img src={guildIcon(c)!} className="h-7 w-7 rounded-full" alt="" />
                         ) : (
-                          <span className="text-zinc-500">Removed</span>
+                          <div className="grid h-7 w-7 place-items-center rounded-full bg-zinc-800 text-xs">
+                            {(c.name ?? "?")[0]}
+                          </div>
                         )}
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{c.raffles}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{c.entries}</td>
-                      <td className="py-2 text-xs text-zinc-500">{c.lastRaffleAt ? formatDate(c.lastRaffleAt) : "—"}</td>
-                    </tr>
-                  ))}
+                        <div>
+                          <div>{c.name ?? <span className="text-zinc-500">Unknown server</span>}</div>
+                          <div className="text-xs text-zinc-500">{c.id}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4">
+                      {c.botPresent === null ? (
+                        <span className="text-zinc-500">?</span>
+                      ) : c.botPresent ? (
+                        <span className="text-emerald-400">Installed</span>
+                      ) : (
+                        <span className="text-zinc-500">Removed</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{c.raffles}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{c.entries}</td>
+                    <td className="py-2 text-xs text-zinc-500">{c.lastRaffleAt ? formatDate(c.lastRaffleAt) : "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -273,24 +284,22 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {stats.users
-                  .filter((u) => has(u.username, u.id))
-                  .map((u) => (
-                    <tr key={u.id}>
-                      <td className="py-2 pr-4">
-                        <div className="flex items-center gap-2">
-                          <img src={userAvatar(u)} className="h-7 w-7 rounded-full" alt="" />
-                          <div>
-                            <div>{u.username}</div>
-                            <div className="text-xs text-zinc-500">{u.id}</div>
-                          </div>
+                {paged(rows.users).map((u) => (
+                  <tr key={u.id}>
+                    <td className="py-2 pr-4">
+                      <div className="flex items-center gap-2">
+                        <img src={userAvatar(u)} className="h-7 w-7 rounded-full" alt="" />
+                        <div>
+                          <div>{u.username}</div>
+                          <div className="text-xs text-zinc-500">{u.id}</div>
                         </div>
-                      </td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{u.rafflesCreated}</td>
-                      <td className="py-2 pr-4 text-xs text-zinc-500">{formatDate(u.firstLoginAt)}</td>
-                      <td className="py-2 text-xs text-zinc-500">{u.lastLoginAt ? formatDate(u.lastLoginAt) : "—"}</td>
-                    </tr>
-                  ))}
+                      </div>
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{u.rafflesCreated}</td>
+                    <td className="py-2 pr-4 text-xs text-zinc-500">{formatDate(u.firstLoginAt)}</td>
+                    <td className="py-2 text-xs text-zinc-500">{u.lastLoginAt ? formatDate(u.lastLoginAt) : "—"}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
@@ -309,26 +318,26 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {stats.recentRaffles
-                  .filter((r) => has(r.title, r.guildName, r.hostName))
-                  .map((r) => (
-                    <tr key={r.id}>
-                      <td className="py-2 pr-4">
-                        <div>{r.title}</div>
-                        {r.chain && <div className="text-xs text-zinc-500">{r.chain}</div>}
-                      </td>
-                      <td className="py-2 pr-4">{r.guildName ?? <span className="text-zinc-500">{r.guildId}</span>}</td>
-                      <td className="py-2 pr-4">{r.hostName ?? "—"}</td>
-                      <td className="py-2 pr-4">{r.allocations}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums">{r.entries}</td>
-                      <td className="py-2 pr-4 text-xs">{r.status}</td>
-                      <td className="py-2 text-xs text-zinc-500">{formatDate(r.createdAt)}</td>
-                    </tr>
-                  ))}
+                {paged(rows.raffles).map((r) => (
+                  <tr key={r.id}>
+                    <td className="py-2 pr-4">
+                      <div>{r.title}</div>
+                      {r.chain && <div className="text-xs text-zinc-500">{r.chain}</div>}
+                    </td>
+                    <td className="py-2 pr-4">{r.guildName ?? <span className="text-zinc-500">{r.guildId}</span>}</td>
+                    <td className="py-2 pr-4">{r.hostName ?? "—"}</td>
+                    <td className="py-2 pr-4">{r.allocations}</td>
+                    <td className="py-2 pr-4 text-right tabular-nums">{r.entries}</td>
+                    <td className="py-2 pr-4 text-xs">{r.status}</td>
+                    <td className="py-2 text-xs text-zinc-500">{formatDate(r.createdAt)}</td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           )}
         </div>
+        {rows[tab].length === 0 && <p className="py-6 text-center text-sm text-zinc-500">Nothing found.</p>}
+        <Pagination page={current} totalPages={totalPages} onChange={setPage} className="mt-4" />
       </div>
     </div>
   );

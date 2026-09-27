@@ -79,15 +79,33 @@ adminRouter.post("/logout", (_req, res) => {
 });
 
 adminRouter.get("/stats", requireAdmin, async (_req, res) => {
-  const [statusCounts, entryCount, winnerCount, users, raffleMeta, recent, botGuilds] = await Promise.all([
+  // Semua user & raffle dikirim sekaligus (halaman admin membagi per halaman & mencari di browser)
+  const [statusCounts, entryCount, winnerCount, users, raffleMeta, botGuilds] = await Promise.all([
     db.raffle.groupBy({ by: ["status"], _count: { _all: true } }),
     db.entry.count(),
     db.entry.count({ where: { status: "WON" } }),
-    db.user.findMany({ orderBy: [{ lastLoginAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }], take: 1000 }),
-    db.raffle.findMany({
-      select: { guildId: true, createdById: true, createdAt: true, _count: { select: { entries: true } } },
+    db.user.findMany({
+      orderBy: [{ lastLoginAt: { sort: "desc", nulls: "last" } }, { createdAt: "desc" }],
+      select: { id: true, username: true, avatar: true, createdAt: true, lastLoginAt: true },
     }),
-    db.raffle.findMany({ orderBy: { createdAt: "desc" }, take: 50, include: { _count: { select: { entries: true } } } }),
+    db.raffle.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        title: true,
+        guildId: true,
+        guildName: true,
+        hostName: true,
+        status: true,
+        chain: true,
+        winnerCount: true,
+        gtdCount: true,
+        fcfsCount: true,
+        createdById: true,
+        createdAt: true,
+        _count: { select: { entries: true } },
+      },
+    }),
     fetchBotGuilds().catch((e) => {
       console.error("[admin] failed to fetch bot guilds", e);
       return null;
@@ -149,11 +167,11 @@ adminRouter.get("/stats", requireAdmin, async (_req, res) => {
       lastLoginAt: u.lastLoginAt,
       rafflesCreated: perCreator.get(u.id) ?? 0,
     })),
-    recentRaffles: recent.map((r) => ({
+    raffles: raffleMeta.map((r) => ({
       id: r.id,
       title: r.title,
       guildId: r.guildId,
-      guildName: names.get(r.guildId)?.name ?? null,
+      guildName: names.get(r.guildId)?.name ?? r.guildName,
       hostName: r.hostName,
       status: r.status,
       allocations: allocationSummary(r),
