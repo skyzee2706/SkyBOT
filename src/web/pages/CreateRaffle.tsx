@@ -109,7 +109,7 @@ export function CreateRafflePage() {
           xPosts: x.posts,
         },
       });
-      navigate(`/r/${raffle.id}`);
+      navigate(`/manage/${guildId}/raffle/${raffle.id}`);
     } catch (err) {
       setError((err as Error).message);
       setSaving(false);
@@ -120,7 +120,7 @@ export function CreateRafflePage() {
 
   return (
     <div className="mx-auto max-w-2xl">
-      <Link to={`/server/${guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to={`/manage/${guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         <ArrowLeft className="mr-1 inline h-4 w-4" />
         {data.guild.name}
       </Link>

@@ -71,7 +71,7 @@ export function GuildPage() {
 
   return (
     <div>
-      <Link to="/create" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to="/manage" className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         <ArrowLeft className="mr-1 inline h-4 w-4" />
         All servers
       </Link>
@@ -80,7 +80,7 @@ export function GuildPage() {
           {icon && <img src={icon} className="h-12 w-12 rounded-xl" alt="" />}
           <h1 className="text-2xl font-bold">{data.guild.name}</h1>
         </div>
-        <Link to={`/server/${guildId}/new`} className="btn btn-primary">
+        <Link to={`/manage/${guildId}/new`} className="btn btn-primary">
           + Create Raffle
         </Link>
       </div>
@@ -94,7 +94,7 @@ export function GuildPage() {
           {data.raffles.map((r) => (
             <Link
               key={r.id}
-              to={`/r/${r.id}`}
+              to={`/manage/${guildId}/raffle/${r.id}`}
               className="card flex flex-wrap items-center gap-4 transition hover:border-brand-500/50"
             >
               {r.imageUrl && <img src={r.imageUrl} className="h-14 w-14 rounded-lg object-cover" alt="" />}

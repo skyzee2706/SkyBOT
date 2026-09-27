@@ -303,6 +303,7 @@ publicRouter.get("/raffles/:id", async (req, res) => {
   res.json({
     raffle: {
       id: raffle.id,
+      guildId: raffle.guildId,
       title: raffle.title,
       description: raffle.description,
       imageUrl: raffle.imageUrl,

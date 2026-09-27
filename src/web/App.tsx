@@ -45,15 +45,18 @@ export function App() {
           <Route path="/raffles" element={<RafflesListPage />} />
           <Route path="/entries" element={auth(<MyEntriesPage />, "entries")} />
           <Route path="/raffle/:id" element={<PublicRafflePage />} />
-          <Route path="/create" element={auth(<GuildsPage />)} />
-          {/* Link lama /manage tetap jalan */}
-          <Route path="/manage" element={<Navigate to="/create" replace />} />
-          <Route path="/server/:guildId" element={auth(<GuildPage />)} />
-          <Route path="/server/:guildId/new" element={auth(<CreateRafflePage />)} />
-          <Route path="/r/:id" element={auth(<RafflePage />)} />
-          {/* Link lama (/g/...) tetap jalan */}
+          {/* Dashboard host: daftar server → raffle per server → kelola 1 raffle */}
+          <Route path="/manage" element={auth(<GuildsPage />)} />
+          <Route path="/manage/:guildId" element={auth(<GuildPage />)} />
+          <Route path="/manage/:guildId/new" element={auth(<CreateRafflePage />)} />
+          <Route path="/manage/:guildId/raffle/:id" element={auth(<RafflePage />)} />
+          {/* Link lama tetap jalan */}
+          <Route path="/create" element={<Navigate to="/manage" replace />} />
+          <Route path="/server/:guildId" element={<OldGuildLink />} />
+          <Route path="/server/:guildId/new" element={<OldGuildLink suffix="/new" />} />
           <Route path="/g/:guildId" element={<OldGuildLink />} />
           <Route path="/g/:guildId/new" element={<OldGuildLink suffix="/new" />} />
+          <Route path="/r/:id" element={auth(<RafflePage />)} />
           <Route path="*" element={<p className="text-zinc-400">Page not found.</p>} />
         </Routes>
       </main>
@@ -124,8 +127,8 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
             <NavLink to="/entries" className={(s) => `${nav(s)} hidden sm:inline`}>
               My Entries
             </NavLink>
-            <NavLink to="/create" className={({ isActive }) => nav({ isActive: isActive || /^\/(server|r)\//.test(pathname) })}>
-              Create Raffle
+            <NavLink to="/manage" className={nav}>
+              Dashboard
             </NavLink>
           </div>
           {me === undefined ? (
@@ -198,7 +201,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
 type LoginKind = "create" | "entries";
 const LOGIN_COPY: Record<LoginKind, { title: string; text: string }> = {
   create: {
-    title: "Log in to create raffles",
+    title: "Log in to your dashboard",
     text: "Log in with Discord to create and manage raffles for servers where you're an admin or have a raffle manager role.",
   },
   entries: {
@@ -225,5 +228,5 @@ function RequireLogin({ me, kind, children }: { me: Me | null | undefined; kind:
 
 function OldGuildLink({ suffix = "" }: { suffix?: string }) {
   const { guildId } = useParams();
-  return <Navigate to={`/server/${guildId}${suffix}`} replace />;
+  return <Navigate to={`/manage/${guildId}${suffix}`} replace />;
 }

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import { api, type Entry, type Raffle } from "../api";
 import { ErrorBox, formatDate, Loading, Pagination, StatusBadge } from "../components";
 import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
@@ -33,6 +33,14 @@ export function RafflePage() {
     api<{ raffle: Raffle; entries: Entry[] }>(`/raffles/${id}`).then(setData).catch((e) => setError(e.message));
   }, [id]);
   useEffect(load, [load]);
+
+  // Link lama (/r/:id) atau server ID yang salah → alamat yang benar: /manage/:serverId/raffle/:id
+  const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const canonical = data ? `/manage/${data.raffle.guildId}/raffle/${data.raffle.id}` : null;
+  useEffect(() => {
+    if (canonical && pathname.replace(/\/$/, "") !== canonical) navigate(canonical, { replace: true });
+  }, [canonical, pathname, navigate]);
 
   const act = async (path: string, body: unknown = {}) => {
     setBusy(true);
@@ -82,7 +90,7 @@ export function RafflePage() {
 
   return (
     <div>
-      <Link to={`/server/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
+      <Link to={`/manage/${raffle.guildId}`} className="mb-4 inline-block text-sm text-zinc-400 hover:text-zinc-200">
         <ArrowLeft className="mr-1 inline h-4 w-4" />
         Back to server
       </Link>

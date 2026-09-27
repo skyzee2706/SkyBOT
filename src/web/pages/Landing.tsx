@@ -79,7 +79,7 @@ const AUDIENCES: { icon: LucideIcon; eyebrow: string; title: string; points: str
       "Export winners to Excel, split by allocation",
     ],
     cta: "Create a raffle",
-    to: "/create",
+    to: "/manage",
   },
 ];
 
@@ -137,7 +137,7 @@ export function LandingPage() {
           <Link to="/raffles" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
             Find WL spots <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link to="/create" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
+          <Link to="/manage" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
             Create a raffle
           </Link>
         </div>
@@ -263,7 +263,7 @@ export function LandingPage() {
           <Link to="/raffles" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
             Find WL spots <ArrowRight className="h-4 w-4" />
           </Link>
-          <Link to="/create" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
+          <Link to="/manage" className="btn btn-ghost w-full px-6 py-3 text-base sm:w-auto">
             Create a raffle
           </Link>
         </div>

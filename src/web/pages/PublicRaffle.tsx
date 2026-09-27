@@ -27,6 +27,7 @@ import { DiscordMarkdown } from "../DiscordMarkdown";
 type PublicRaffle = {
   raffle: {
     id: string;
+    guildId: string;
     title: string;
     description: string;
     imageUrl: string | null;
@@ -210,7 +211,7 @@ export function PublicRafflePage() {
 
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           {canManage && (
-            <Link to={`/r/${r.id}`} className="btn btn-ghost w-full">
+            <Link to={`/manage/${r.guildId}/raffle/${r.id}`} className="btn btn-ghost w-full">
               <Settings className="h-4 w-4" /> Manage raffle (full participant data)
             </Link>
           )}
