@@ -1,20 +1,23 @@
 import { Router, type Request } from "express";
+import type { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { db } from "../db.js";
 import { fetchBotGuildIds, fetchMember, fetchTextChannels, getGuildContext } from "../discord.js";
 import { botInviteUrl, xEnabled } from "../env.js";
-import { cancelRaffle, disqualifyEntry, endRaffle, publishRaffle } from "../raffle/service.js";
+import { publishRaffle, refreshMessage } from "../raffle/service.js";
+import { scheduleDraw } from "../raffle/schedule.js";
+import { cancelRaffle, closeOverdueInBackground, disqualifyEntry, endRaffle } from "../raffle/draw.js";
+import { audit } from "../raffle/audit.js";
+import { rateLimit } from "../rateLimit.js";
 import { getXPosts, hasXTasks, MAX_FOLLOWS, MAX_POSTS, type XPost } from "../raffle/xtasks.js";
 import { discordUserApi, requireAuth, type AuthUser } from "./auth.js";
-import { rawImageBody, saveImage } from "./images.js";
+import { importImageFromUrl, isOwnImageUrl, rawImageBody, saveImage } from "./images.js";
 import { buildXlsx, type Cell, type RowStyle } from "../xlsx.js";
-import { ALLOCATIONS, allocationCount, chainLabel, chainWallet, discordAvatarUrl, hasAllocations, normalizeChain } from "../../shared/raffle.js";
+import { ALLOCATIONS, allocationCount, chainWallet, discordAvatarUrl, hasAllocations, normalizeChain } from "../../shared/raffle.js";
 
-export class HttpError extends Error {
-  constructor(public status: number, message: string) {
-    super(message);
-  }
-}
+import { HttpError } from "../httpError.js";
+
+export { HttpError };
 
 const userOf = (res: { locals: Record<string, unknown> }) => res.locals.user as AuthUser;
 const param = (req: Request, name: string) => String(req.params[name]);
@@ -158,6 +161,7 @@ dashboardRouter.post("/guilds/:guildId/images", rawImageBody, async (req, res) =
   const guildId = param(req, "guildId");
   const user = userOf(res);
   await requireManager(guildId, user.id);
+  await rateLimit("upload", user.id, 20, 10 * 60_000);
   const result = await saveImage(req, guildId, user.id);
   if ("error" in result) throw new HttpError(400, result.error!);
   res.json(result);
@@ -181,11 +185,19 @@ dashboardRouter.put("/guilds/:guildId/settings", async (req, res) => {
   res.json({ managerRoleIds });
 });
 
+const titleSchema = z.string().trim().min(1, "Title is required").max(200);
+const descriptionSchema = z.string().max(3000);
+const imageUrlSchema = z.union([
+  z.literal(""),
+  z.string().trim().url("Invalid image URL").regex(/^https:\/\//i, "Image links must start with https://"),
+]);
+const endsAtSchema = z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now");
+
 const createSchema = z.object({
   channelId: z.string().min(1, "Please choose a channel"),
-  title: z.string().trim().min(1, "Title is required").max(200),
-  description: z.string().max(3000).default(""),
-  imageUrl: z.union([z.literal(""), z.string().url("Invalid image URL")]).optional(),
+  title: titleSchema,
+  description: descriptionSchema.default(""),
+  imageUrl: imageUrlSchema.optional(),
   // Allocations: GTD dan/atau FCFS (0 = tidak dipakai), minimal salah satu.
   gtdCount: z.coerce.number().int("GTD must be a whole number").min(0).max(1000, "Maximum 1000 GTD").default(0),
   fcfsCount: z.coerce.number().int("FCFS must be a whole number").min(0).max(1000, "Maximum 1000 FCFS").default(0),
@@ -194,7 +206,7 @@ const createSchema = z.object({
     .string({ error: "Chain is required" })
     .transform(normalizeChain)
     .refine((s) => s.length > 0, "Chain is required"),
-  endsAt: z.coerce.date().refine((d) => d.getTime() > Date.now() + 60_000, "End time must be at least 1 minute from now"),
+  endsAt: endsAtSchema,
   requiredRoleIds: z.array(z.string()).default([]),
   requireMember: z.boolean().default(true),
   // Link invite Discord (discord.gg/... atau discord.com/invite/...), opsional
@@ -240,9 +252,11 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   const guildId = param(req, "guildId");
   const user = userOf(res);
   const ctx = await requireManager(guildId, user.id);
+  await rateLimit("create", user.id, 20, 3_600_000);
   const parsed = createSchema.safeParse(req.body);
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
-  const { imageUrl, winnerRoleId, xPosts: postInputs, chain, ...data } = parsed.data;
+  const { winnerRoleId, xPosts: postInputs, chain, ...data } = parsed.data;
+  let imageUrl = parsed.data.imageUrl;
   if (!data.requireMember && data.requiredRoleIds.length) {
     throw new HttpError(400, "Required roles only work when participants must be server members.");
   }
@@ -272,6 +286,13 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
     throw new HttpError(400, "X tasks are not enabled yet. The admin needs to set X_API_KEY and X_API_SECRET.");
   }
 
+  // Link gambar dari luar diunduh & disimpan di SkyBOT (lihat importImageFromUrl)
+  if (imageUrl && !isOwnImageUrl(imageUrl)) {
+    const imported = await importImageFromUrl(imageUrl, guildId, user.id);
+    if ("error" in imported) throw new HttpError(400, imported.error);
+    imageUrl = imported.url;
+  }
+
   const raffle = await db.raffle.create({
     data: {
       ...data,
@@ -281,7 +302,6 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
       guildId,
       imageUrl: imageUrl || null,
       winnerRoleId: winnerRoleId || null,
-      requireAnyRole: true,
       inviteUrl: data.inviteUrl || null,
       winnerCount,
       chain,
@@ -293,7 +313,9 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
     },
   });
   try {
-    res.json(await publishRaffle(raffle));
+    const published = await publishRaffle(raffle);
+    await audit(raffle.id, user, "created");
+    res.json(published);
   } catch (e) {
     await db.raffle.delete({ where: { id: raffle.id } });
     console.error("[raffle] publish failed", e);
@@ -303,41 +325,89 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
 
 dashboardRouter.get("/raffles/:id", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
-  if (raffle.status === "ACTIVE" && raffle.endsAt.getTime() <= Date.now()) await endRaffle(raffle.id);
-  const [fresh, entries] = await Promise.all([
+  await closeOverdueInBackground(raffle);
+  const [fresh, entries, activity] = await Promise.all([
     db.raffle.findUniqueOrThrow({ where: { id: raffle.id } }),
     db.entry.findMany({ where: { raffleId: raffle.id }, orderBy: { createdAt: "asc" } }),
+    db.auditLog.findMany({ where: { raffleId: raffle.id }, orderBy: { createdAt: "desc" }, take: 100 }),
   ]);
   res.json({
     raffle: { ...fresh, xPosts: getXPosts(fresh) },
-    // Entry lama menyimpan 1 link quote di kolom tunggal
-    entries: entries.map(({ xQuoteUrl, ...e }) => ({
-      ...e,
-      xQuoteUrls: e.xQuoteUrls.length ? e.xQuoteUrls : xQuoteUrl ? [xQuoteUrl] : [],
-    })),
+    entries,
+    activity,
   });
+});
+
+// Edit raffle yang masih berjalan. Hanya teks, gambar & waktu selesai — syarat & allocation tidak bisa diubah
+// setelah raffle diposting supaya adil bagi yang sudah ikut.
+const editSchema = z.object({
+  title: titleSchema.optional(),
+  description: descriptionSchema.optional(),
+  imageUrl: imageUrlSchema.optional(),
+  endsAt: endsAtSchema.optional(),
+});
+
+dashboardRouter.patch("/raffles/:id", async (req, res) => {
+  const user = userOf(res);
+  const raffle = await requireRaffle(param(req, "id"), user.id);
+  if (raffle.status !== "ACTIVE" || raffle.endsAt.getTime() <= Date.now()) throw new HttpError(400, "Only running raffles can be edited.");
+  const parsed = editSchema.safeParse(req.body ?? {});
+  if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
+  const input = parsed.data;
+
+  let imageUrl = input.imageUrl === undefined ? undefined : input.imageUrl || null;
+  if (imageUrl && imageUrl !== raffle.imageUrl && !isOwnImageUrl(imageUrl)) {
+    const imported = await importImageFromUrl(imageUrl, raffle.guildId, user.id);
+    if ("error" in imported) throw new HttpError(400, imported.error);
+    imageUrl = imported.url;
+  }
+  const changes: Prisma.RaffleUpdateInput = {};
+  const changed: string[] = [];
+  if (input.title !== undefined && input.title !== raffle.title) (changes.title = input.title), changed.push("title");
+  if (input.description !== undefined && input.description !== raffle.description)
+    (changes.description = input.description), changed.push("description");
+  if (imageUrl !== undefined && imageUrl !== raffle.imageUrl) (changes.imageUrl = imageUrl), changed.push("image");
+  if (input.endsAt && input.endsAt.getTime() !== raffle.endsAt.getTime()) {
+    changes.endsAt = input.endsAt;
+    changed.push(`end time (${raffle.endsAt.toISOString()} → ${input.endsAt.toISOString()})`);
+  }
+  if (!changed.length) return void res.json({ ok: true });
+
+  // Hanya berhasil kalau raffle masih berjalan saat disimpan (tidak bentrok dengan undian)
+  const { count } = await db.raffle.updateMany({ where: { id: raffle.id, status: "ACTIVE" }, data: changes as Prisma.RaffleUpdateManyMutationInput });
+  if (!count) throw new HttpError(400, "Only running raffles can be edited.");
+  const updated = await db.raffle.findUniqueOrThrow({ where: { id: raffle.id } });
+  // Jadwal undian lama tetap aman: saat terpanggil, raffle yang belum waktunya dijadwalkan ulang
+  if (changes.endsAt) await scheduleDraw(updated);
+  await refreshMessage(raffle.id).catch((e) => console.error("[raffle] failed to update embed after edit", e));
+  await audit(raffle.id, user, "edited", changed.join(", "));
+  res.json({ ok: true });
 });
 
 dashboardRouter.post("/raffles/:id/end", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   if (!(await endRaffle(raffle.id))) throw new HttpError(400, "This raffle is no longer active.");
+  await audit(raffle.id, userOf(res), "ended", "Ended early");
   res.json({ ok: true });
 });
 
 dashboardRouter.post("/raffles/:id/cancel", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   await cancelRaffle(raffle.id);
+  await audit(raffle.id, userOf(res), "cancelled");
   res.json({ ok: true });
 });
 
 dashboardRouter.post("/raffles/:id/entries/:entryId/disqualify", async (req, res) => {
   const raffle = await requireRaffle(param(req, "id"), userOf(res).id);
   const note = z.string().trim().max(200).catch("").parse(req.body?.note) || "Disqualified by admin";
-  await disqualifyEntry(raffle.id, param(req, "entryId"), note);
-  res.json({ ok: true });
+  const entry = await db.entry.findFirst({ where: { id: param(req, "entryId"), raffleId: raffle.id } });
+  if (!entry) throw new HttpError(404, "Participant not found.");
+  const { replaced } = await disqualifyEntry(raffle.id, entry.id, note);
+  await audit(raffle.id, userOf(res), "disqualified", `${entry.username} (${entry.userId})${replaced ? " — replacement drawn" : ""}: ${note}`);
+  res.json({ ok: true, replaced });
 });
 
-// Export winner: hanya data yang dibutuhkan untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
 // Export winner: hanya data untuk kirim hadiah. Kolom X / wallet hanya ada kalau raffle-nya memakai itu.
 // Raffle dengan allocation: satu sheet berisi tabel GTD Winners lalu tabel FCFS Winners (bertumpuk).
 dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {

@@ -5,7 +5,8 @@ import { z } from "zod";
 import { db } from "../db.js";
 import { fetchMember, isDiscordError, rest } from "../discord.js";
 import { connectXUrl, taskClickUrl } from "../x.js";
-import { endRaffle, enterRaffle, type Reply } from "../raffle/service.js";
+import { enterRaffle, type Reply } from "../raffle/service.js";
+import { closeOverdueInBackground } from "../raffle/draw.js";
 import { checkRequirements } from "../raffle/requirements.js";
 import { hasXTasks, quotePosts, xTaskList } from "../raffle/xtasks.js";
 import {
@@ -20,6 +21,7 @@ import {
 import { saveWallet, savedWallet } from "../raffle/wallets.js";
 import { xEnabled } from "../env.js";
 import { currentUser } from "./auth.js";
+import { rateLimit } from "../rateLimit.js";
 import { canManageGuild, HttpError } from "./dashboard.js";
 
 // Halaman raffle publik (/raffle/:id): siapa pun bisa melihat, peserta bisa ikut lewat web
@@ -54,11 +56,8 @@ function plainText(reply: Reply, guild: GuildInfo | null) {
 async function loadRaffle(req: Request) {
   const raffle = await db.raffle.findUnique({ where: { id: String(req.params.id) } });
   if (!raffle) throw new HttpError(404, "Raffle not found.");
-  // Raffle yang waktunya sudah lewat langsung diundi (jaring pengaman kalau jadwal terlambat)
-  if (raffle.status === "ACTIVE" && raffle.endsAt.getTime() <= Date.now()) {
-    await endRaffle(raffle.id);
-    return db.raffle.findUniqueOrThrow({ where: { id: raffle.id } });
-  }
+  // Raffle yang waktunya sudah lewat ditutup; undiannya berjalan di belakang layar (halaman tidak ikut menunggu)
+  if (await closeOverdueInBackground(raffle)) return db.raffle.findUniqueOrThrow({ where: { id: raffle.id } });
   return raffle;
 }
 
@@ -125,12 +124,19 @@ publicRouter.get("/raffles", async (req, res) => {
   let raffles: (Raffle & { _count: { entries: number } })[];
   let total: number;
   if (sort === "odds") {
-    // Peluang terbaik = jumlah spot dibanding jumlah peserta; dihitung di memori (maks 1000 raffle)
-    const all = await db.raffle.findMany({ where, include, take: 1000, orderBy: { endsAt: "asc" } });
+    // Peluang terbaik = jumlah spot dibanding jumlah peserta. Diurutkan dari data ringkas semua raffle yang cocok,
+    // lalu hanya raffle di halaman ini yang dimuat lengkap.
+    const all = await db.raffle.findMany({
+      where,
+      select: { id: true, winnerCount: true, _count: { select: { entries: true } } },
+      orderBy: { endsAt: "asc" },
+    });
     const odds = (r: (typeof all)[number]) => r.winnerCount / Math.max(1, r._count.entries);
     all.sort((a, b) => odds(b) - odds(a));
     total = all.length;
-    raffles = all.slice(skip, skip + LIST_PAGE_SIZE);
+    const ids = all.slice(skip, skip + LIST_PAGE_SIZE).map((r) => r.id);
+    const byId = new Map((await db.raffle.findMany({ where: { id: { in: ids } }, include })).map((r) => [r.id, r]));
+    raffles = ids.map((id) => byId.get(id)!).filter(Boolean);
   } else {
     const orderBy: Prisma.RaffleOrderByWithRelationInput[] =
       sort === "popular"
@@ -241,11 +247,30 @@ const walletSchema = z.object({ type: z.enum(["EVM", "SOL"]), address: z.string(
 publicRouter.post("/me/wallet", async (req, res) => {
   const user = await currentUser(req);
   if (!user) throw new HttpError(401, "Log in with Discord first.");
+  await rateLimit("wallet", user.id, 10, 3_600_000);
   const input = walletSchema.safeParse(req.body ?? {});
   if (!input.success) throw new HttpError(400, "Invalid form data.");
   const saved = await saveWallet(user.id, input.data.type, input.data.address);
   if ("error" in saved) throw new HttpError(400, saved.error);
   res.json({ ok: true, wallet: saved.wallet });
+});
+
+// Hapus wallet tersimpan (raffle yang sudah diikuti tetap memakai wallet lamanya)
+publicRouter.delete("/me/wallet", async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Log in with Discord first.");
+  const type = z.enum(["EVM", "SOL"]).safeParse(req.query.type);
+  if (!type.success) throw new HttpError(400, "Invalid wallet type.");
+  await db.userWallet.updateMany({ where: { discordId: user.id }, data: type.data === "EVM" ? { evm: null } : { sol: null } });
+  res.json({ ok: true });
+});
+
+// Putuskan akun X (raffle yang sudah diikuti tetap menyimpan username X saat ikut)
+publicRouter.delete("/me/x", async (req, res) => {
+  const user = await currentUser(req);
+  if (!user) throw new HttpError(401, "Log in with Discord first.");
+  await db.xLink.deleteMany({ where: { discordId: user.id } });
+  res.json({ ok: true });
 });
 
 // Daftar peserta publik: hanya username + foto Discord (+ tanda pemenang). Wallet, X & link quote hanya untuk host.
@@ -324,7 +349,6 @@ publicRouter.get("/raffles/:id", async (req, res) => {
       spots: raffle.winnerCount,
       walletType: raffle.walletType,
       minAccountAgeDays: raffle.minAccountAgeDays,
-      requireAnyRole: raffle.requireAnyRole,
       requireMember: raffle.requireMember,
       inviteUrl: raffle.inviteUrl,
       requiredRoles: raffle.requiredRoleIds.map((id) => ({ id, ...(guild?.roles.get(id) ?? { name: "deleted-role", color: 0 }) })),
@@ -382,6 +406,7 @@ const enterSchema = z.object({
 publicRouter.post("/raffles/:id/enter", async (req, res) => {
   const user = await currentUser(req);
   if (!user) throw new HttpError(401, "Log in with Discord to enter.");
+  await rateLimit("enter", user.id, 20, 10 * 60_000);
   const raffle = await loadRaffle(req);
   const input = enterSchema.safeParse(req.body ?? {});
   if (!input.success) throw new HttpError(400, "Invalid form data.");

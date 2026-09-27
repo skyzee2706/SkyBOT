@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { api, ApiError } from "../api";
+import { api, ApiError, loginUrl } from "../api";
 import { ErrorBox, formatDate, Loading, Pagination } from "../components";
 import { Lock } from "lucide-react";
 import { LogoMark } from "../Logo";
@@ -18,6 +18,16 @@ type Stats = {
     communities: number | null;
     communitiesWithRaffles: number;
   };
+  attention: {
+    id: string;
+    title: string;
+    guildId: string;
+    guildName: string | null;
+    endedAt: string | null;
+    drawPending: boolean;
+    announcePending: boolean;
+    drawError: string | null;
+  }[];
   communities: {
     id: string;
     name: string | null;
@@ -58,14 +68,14 @@ const userAvatar = (u: { id: string; avatar: string | null }) =>
 
 const ADMIN_PAGE_SIZE = 50;
 
-// Halaman tersembunyi (tidak ada link ke sini). Login pakai PIN, terpisah dari login Discord.
+// Halaman tersembunyi (tidak ada link ke sini). Hanya akun Discord yang ada di ADMIN_DISCORD_IDS.
 export function AdminPage() {
-  const [state, setState] = useState<"loading" | "disabled" | "locked" | "open">("loading");
+  const [state, setState] = useState<"loading" | "disabled" | "login" | "denied" | "open">("loading");
 
   useEffect(() => {
-    api<{ enabled: boolean; loggedIn: boolean }>("/admin/session")
-      .then((s) => setState(!s.enabled ? "disabled" : s.loggedIn ? "open" : "locked"))
-      .catch(() => setState("locked"));
+    api<{ enabled: boolean; loggedIn: boolean; isAdmin: boolean }>("/admin/session")
+      .then((s) => setState(!s.enabled ? "disabled" : !s.loggedIn ? "login" : s.isAdmin ? "open" : "denied"))
+      .catch(() => setState("login"));
   }, []);
 
   return (
@@ -75,70 +85,26 @@ export function AdminPage() {
           <Link to="/" className="flex items-center gap-2 font-semibold">
             <LogoMark /> SkyBOT Raffle <span className="text-sm font-normal text-zinc-500">· Admin</span>
           </Link>
-          {state === "open" && (
-            <button
-              className="text-sm text-zinc-400 hover:text-zinc-200"
-              onClick={async () => {
-                await api("/admin/logout", { method: "POST" });
-                setState("locked");
-              }}
-            >
-              Lock
-            </button>
-          )}
         </div>
       </header>
       <main className="mx-auto max-w-6xl px-4 py-8">
         {state === "loading" && <Loading />}
         {state === "disabled" && (
-          <p className="text-center text-zinc-400">The admin page is disabled. Set ADMIN_PIN in Vercel to enable it.</p>
+          <p className="text-center text-zinc-400">The admin page is disabled. Set ADMIN_DISCORD_IDS in Vercel to enable it.</p>
         )}
-        {state === "locked" && <PinForm onUnlock={() => setState("open")} />}
-        {state === "open" && <Dashboard onExpired={() => setState("locked")} />}
+        {state === "login" && (
+          <div className="card mx-auto mt-10 max-w-sm space-y-4 text-center">
+            <Lock className="mx-auto h-8 w-8 text-brand-400" />
+            <h1 className="text-lg font-semibold">Admin</h1>
+            <a href={loginUrl("/admin")} className="btn btn-primary w-full">
+              Log in with Discord
+            </a>
+          </div>
+        )}
+        {state === "denied" && <p className="text-center text-zinc-400">Page not found.</p>}
+        {state === "open" && <Dashboard onExpired={() => setState("login")} />}
       </main>
     </div>
-  );
-}
-
-function PinForm({ onUnlock }: { onUnlock: () => void }) {
-  const [pin, setPin] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-
-  const submit = async (e: FormEvent) => {
-    e.preventDefault();
-    setBusy(true);
-    setError(null);
-    try {
-      await api("/admin/login", { body: { pin } });
-      onUnlock();
-    } catch (err) {
-      setError((err as Error).message);
-      setPin("");
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  return (
-    <form onSubmit={submit} className="card mx-auto mt-10 max-w-sm space-y-4 text-center">
-      <Lock className="mx-auto h-8 w-8 text-brand-400" />
-      <h1 className="text-lg font-semibold">Enter admin PIN</h1>
-      <input
-        className="input text-center text-2xl tracking-[0.5em]"
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        maxLength={12}
-        autoFocus
-        value={pin}
-        onChange={(e) => setPin(e.target.value.replace(/\D/g, ""))}
-      />
-      {error && <p className="text-sm text-red-400">{error}</p>}
-      <button className="btn btn-primary w-full" disabled={busy || pin.length < 6}>
-        {busy ? "Checking..." : "Unlock"}
-      </button>
-    </form>
   );
 }
 
@@ -165,7 +131,7 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
     setError(null);
     api<Stats>("/admin/stats")
       .then(setStats)
-      .catch((e) => (e instanceof ApiError && e.status === 401 ? onExpired() : setError(e.message)));
+      .catch((e) => (e instanceof ApiError && (e.status === 401 || e.status === 404) ? onExpired() : setError(e.message)));
   }, [onExpired]);
   useEffect(load, [load]);
 
@@ -202,6 +168,29 @@ function Dashboard({ onExpired }: { onExpired: () => void }) {
         <Stat label="Users logged in" value={t.users} sub={`${t.creators} created a raffle`} />
         <Stat label="Entries" value={t.entries} sub={`${t.winners} winners`} />
       </div>
+
+      {stats.attention.length > 0 && (
+        <div className="card border-amber-800">
+          <h2 className="mb-1 font-semibold text-amber-300">Draws that need attention ({stats.attention.length})</h2>
+          <p className="mb-3 text-xs text-zinc-500">These retry automatically. If one stays here for more than an hour, check the error.</p>
+          <div className="space-y-2 text-sm">
+            {stats.attention.map((r) => (
+              <div key={r.id} className="rounded-lg border border-zinc-800 px-3 py-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link to={`/raffle/${r.id}`} className="font-medium text-brand-300 hover:underline">
+                    {r.title}
+                  </Link>
+                  <span className="text-xs text-zinc-500">{r.guildName ?? r.guildId}</span>
+                  <span className="text-xs text-amber-400">
+                    {r.drawPending ? "Drawing unfinished" : r.announcePending ? "Announcement not sent" : "Last attempt failed"}
+                  </span>
+                </div>
+                {r.drawError && <div className="mt-1 break-all font-mono text-xs text-red-400">{r.drawError}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="card">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">

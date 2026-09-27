@@ -11,6 +11,7 @@ import { PublicRafflePage } from "./pages/PublicRaffle";
 import { RafflesListPage } from "./pages/RafflesList";
 import { LandingPage } from "./pages/Landing";
 import { MyEntriesPage } from "./pages/MyEntries";
+import { PrivacyPage, TermsPage } from "./pages/Legal";
 import { ChevronDown, Ticket, Wallet } from "lucide-react";
 import { LogoMark } from "./Logo";
 import { WalletDialog, XLogo, type Profile } from "./Profile";
@@ -45,6 +46,8 @@ export function App() {
           <Route path="/raffles" element={<RafflesListPage />} />
           <Route path="/entries" element={auth(<MyEntriesPage />, "entries")} />
           <Route path="/raffle/:id" element={<PublicRafflePage />} />
+          <Route path="/privacy" element={<PrivacyPage />} />
+          <Route path="/terms" element={<TermsPage />} />
           {/* Dashboard host: daftar server → raffle per server → kelola 1 raffle */}
           <Route path="/manage" element={auth(<GuildsPage />)} />
           <Route path="/manage/:guildId" element={auth(<GuildPage />)} />
@@ -54,8 +57,6 @@ export function App() {
           <Route path="/create" element={<Navigate to="/manage" replace />} />
           <Route path="/server/:guildId" element={<OldGuildLink />} />
           <Route path="/server/:guildId/new" element={<OldGuildLink suffix="/new" />} />
-          <Route path="/g/:guildId" element={<OldGuildLink />} />
-          <Route path="/g/:guildId/new" element={<OldGuildLink suffix="/new" />} />
           <Route path="/r/:id" element={auth(<RafflePage />)} />
           <Route path="*" element={<p className="text-zinc-400">Page not found.</p>} />
         </Routes>
@@ -104,7 +105,7 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
     onLogout();
     // Muat ulang penuh supaya semua data halaman (status ikut raffle, dll.) ikut ter-reset.
     // Halaman publik tetap di tempat; halaman yang butuh login kembali ke beranda.
-    const isPublic = pathname === "/" || pathname === "/raffles" || pathname.startsWith("/raffle/");
+    const isPublic = ["/", "/raffles", "/privacy", "/terms"].includes(pathname) || pathname.startsWith("/raffle/");
     window.location.assign(isPublic ? window.location.pathname + window.location.search : "/");
   };
 
@@ -172,6 +173,17 @@ function Header({ me, onLogout }: { me: Me | null | undefined; onLogout: () => v
                         "Connect X"
                       )}
                     </a>
+                  )}
+                  {profile?.xUsername && (
+                    <button
+                      onClick={async () => {
+                        await api("/p/me/x", { method: "DELETE" }).catch(() => {});
+                        setProfile({ ...profile, xUsername: null });
+                      }}
+                      className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300"
+                    >
+                      Disconnect X
+                    </button>
                   )}
                   <button
                     onClick={logout}

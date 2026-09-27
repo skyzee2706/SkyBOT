@@ -9,11 +9,12 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -n server,web -c blue,magenta \"tsx watch src/server/dev.ts\" \"vite\"",
-    "build": "prisma generate && prisma db push --skip-generate && vite build",
-    "db:push": "prisma db push",
+    "build": "prisma generate && tsx scripts/db-migrate.ts pre && prisma db push --skip-generate && tsx scripts/db-migrate.ts post && vite build",
+    "db:push": "tsx scripts/db-migrate.ts pre && prisma db push && tsx scripts/db-migrate.ts post",
     "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "test": "tsx --test --test-concurrency=1 tests/*.test.ts"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",

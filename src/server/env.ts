@@ -23,8 +23,19 @@ const schema = z.object({
   X_API_SECRET: z.string().optional(),
   // Diisi otomatis oleh Vercel Cron bila di-set di Project Settings.
   CRON_SECRET: z.string().optional(),
-  // PIN halaman /admin (statistik). Kosong = halaman admin nonaktif.
-  ADMIN_PIN: z.string().trim().regex(/^\d{6,12}$/, "ADMIN_PIN must be 6-12 digits").optional(),
+  // ID Discord yang boleh membuka halaman /admin (pisahkan dengan koma). Kosong = halaman admin nonaktif.
+  ADMIN_DISCORD_IDS: z
+    .string()
+    .trim()
+    .regex(/^(\d{17,20}[\s,]*)*$/, "ADMIN_DISCORD_IDS must be Discord user IDs separated by commas")
+    .optional(),
+  // Webhook Discord (opsional) untuk peringatan, mis. undian yang terputus
+  ALERT_WEBHOOK_URL: z
+    .string()
+    .trim()
+    .regex(/^https:\/\/(canary\.|ptb\.)?discord(app)?\.com\/api\/webhooks\//, "ALERT_WEBHOOK_URL must be a Discord webhook URL")
+    .optional()
+    .or(z.literal("").transform(() => undefined)),
   PORT: z.coerce.number().default(3000),
 });
 

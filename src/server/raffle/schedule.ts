@@ -27,6 +27,17 @@ export async function scheduleDraw(raffle: Pick<Raffle, "id" | "endsAt">) {
   });
 }
 
+// Lanjutkan undian yang terputus beberapa detik lagi (lokal: ditangani ticker di dev.ts)
+export async function scheduleResume(raffleId: string, delaySeconds = 20) {
+  if (isLocal || !qstash) return;
+  await qstash.publishJSON({
+    url: `${env.PUBLIC_URL}/api/cron/draw`,
+    body: { raffleId },
+    notBefore: Math.ceil(Date.now() / 1000) + delaySeconds,
+    retries: 3,
+  });
+}
+
 export async function verifyQStash(signature: string | undefined, body: string) {
   if (!receiver || !signature) return false;
   try {

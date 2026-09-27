@@ -41,7 +41,6 @@ type PublicRaffle = {
     spots: number;
     walletType: "NONE" | "EVM" | "SOL" | "CUSTOM";
     minAccountAgeDays: number;
-    requireAnyRole: boolean;
     requireMember: boolean;
     inviteUrl: string | null;
     requiredRoles: { id: string; name: string; color: number }[];
@@ -118,7 +117,7 @@ export function PublicRafflePage() {
   }, [ended, load]);
 
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
-  const { raffle: r, guild, viewer, canManage } = data;
+  const { raffle: r, guild, canManage } = data;
   const active = r.status === "ACTIVE";
   // Kembali ke halaman sebelumnya kalau datang dari dalam web; kalau dibuka langsung (mis. dari Discord), ke daftar raffle
   const cameFromApp = (window.history.state?.idx ?? 0) > 0;
@@ -173,10 +172,10 @@ export function PublicRafflePage() {
             <h2 className="mb-1 font-semibold">Requirements</h2>
             {r.requiredRoles.length > 0 && (
               <div>
-                {r.requireAnyRole && r.requiredRoles.length > 1 ? "Have one of these roles: " : "Required role: "}
+                {r.requiredRoles.length > 1 ? "Have one of these roles: " : "Required role: "}
                 {r.requiredRoles.map((role, i) => (
                   <span key={role.id}>
-                    {i > 0 && (r.requireAnyRole ? " or " : ", ")}
+                    {i > 0 && " or "}
                     <span style={{ color: roleColor(role.color) }}>@{role.name}</span>
                   </span>
                 ))}

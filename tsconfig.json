@@ -11,7 +11,8 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
+    "noUnusedLocals": true,
     "types": ["node", "vite/client"]
   },
-  "include": ["src", "api", "vite.config.ts"]
+  "include": ["src", "api", "scripts", "tests", "vite.config.ts"]
 }

@@ -3,6 +3,7 @@ import { Router, type NextFunction, type Request, type Response } from "express"
 import { db } from "../db.js";
 import { env, OAUTH_REDIRECT } from "../env.js";
 import { safeReturnPath } from "../../shared/raffle.js";
+import { open, seal } from "../secretBox.js";
 
 const DISCORD_API = "https://discord.com/api/v10";
 const SESSION_DAYS = 7;
@@ -78,7 +79,7 @@ authRouter.get("/callback", async (req, res) => {
 
   const sid = randomBytes(32).toString("hex");
   const expiresAt = new Date(Date.now() + Math.min(SESSION_DAYS * 86_400, token.expires_in) * 1000);
-  await db.session.create({ data: { id: sid, userId: u.id, accessToken: token.access_token, expiresAt } });
+  await db.session.create({ data: { id: sid, userId: u.id, accessToken: seal(token.access_token), expiresAt } });
 
   res.cookie("sid", sid, { httpOnly: true, sameSite: "lax", secure, expires: expiresAt });
   const next = safeReturnPath(req.cookies.oauth_next);
@@ -114,7 +115,13 @@ async function loadSession(sid: string): Promise<AuthUser | null> {
     sessionCache.delete(sid);
     return null;
   }
-  const user = { id: s.user.id, username: s.user.username, avatar: s.user.avatar, accessToken: s.accessToken };
+  const accessToken = open(s.accessToken);
+  if (!accessToken) return null; // kunci enkripsi berubah → login ulang
+  // Sesi lama yang tokennya belum terenkripsi: enkripsi sekarang
+  if (accessToken === s.accessToken) {
+    await db.session.update({ where: { id: sid }, data: { accessToken: seal(accessToken) } }).catch(() => {});
+  }
+  const user = { id: s.user.id, username: s.user.username, avatar: s.user.avatar, accessToken };
   sessionCache.set(sid, { user, expiresAt: s.expiresAt.getTime(), cachedAt: Date.now() });
   return user;
 }

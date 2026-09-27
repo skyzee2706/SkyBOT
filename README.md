@@ -53,7 +53,8 @@ re-verified against Discord, and the results are announced in the channel, split
 - **Chain selection**: Ethereum, Base, Robinhood, Ink, Arc, Unichain, Solana, or any custom chain
 - **Hosted by** line with the host's Discord name and avatar
 - Mention `@everyone` or selected roles when a raffle is posted
-- End early, cancel, or disqualify participants at any time
+- **Edit** title, description, image and end time while a raffle runs
+- End early, cancel, or disqualify participants at any time; disqualified winners are **replaced automatically**
 
 </td>
 <td width="50%" valign="top">
@@ -87,7 +88,8 @@ re-verified against Discord, and the results are announced in the channel, split
 - **Raffle manager roles**: delegate raffle management without Manage Server permission
 - Full participant data for hosts (20 per page): wallets, X accounts, quote links
 - **Excel export** of winners with separate GTD and FCFS tables
-- Hidden, PIN-protected **admin statistics** page
+- **Activity log** per raffle (created, edited, ended, disqualified, drawn)
+- Hidden **admin statistics** page for allow-listed Discord accounts, with a list of draws that need attention
 
 </td>
 </tr>
@@ -127,6 +129,8 @@ sequenceDiagram
 ### Fairness and integrity
 - Winners are picked with Node's `crypto.randomInt` (a CSPRNG), never `Math.random`.
 - Ending a raffle is an atomic `ACTIVE → ENDED` transition, so a draw can never run twice.
+- Draws are resumable: winners already picked are kept, and an interrupted draw (Discord error, server time limit)
+  continues automatically a few seconds later. A lock guarantees two processes never draw the same raffle at once.
 - Every winner is re-checked at draw time (server membership, roles, account age). Anyone who no longer qualifies is
   disqualified and replaced automatically.
 - One entry per Discord account, and each wallet and X account can be linked to only one Discord account.
@@ -218,7 +222,8 @@ Message History, Mention Everyone** and **Manage Roles**.
 | `QSTASH_*` | Recommended | Exact-time draw scheduling |
 | `CRON_SECRET` | Recommended | Protects the daily safety-net cron |
 | `X_API_KEY`, `X_API_SECRET` | Optional | Enables X tasks |
-| `ADMIN_PIN` | Optional | 6–12 digit PIN for `/admin`; leave empty to disable |
+| `ADMIN_DISCORD_IDS` | Optional | Discord user IDs (comma separated) that can open `/admin`; empty = disabled |
+| `ALERT_WEBHOOK_URL` | Optional | Discord webhook that receives alerts, e.g. an interrupted draw |
 
 ## Local development
 
@@ -231,11 +236,28 @@ npm run dev                 # API on :3000, web on :5173
 
 Discord buttons and X sign-in need a public URL, so test those flows on a Vercel preview deployment.
 
+### Tests
+
+The tests use a real PostgreSQL database and a fake Discord API, and run in CI on every push.
+
+```bash
+createdb skybot_test
+DATABASE_URL=postgresql://localhost/skybot_test npm run db:push
+TEST_DATABASE_URL=postgresql://localhost/skybot_test npm test
+```
+
+### Database changes
+
+`npm run build` runs `scripts/db-migrate.ts pre`, then `prisma db push`, then `scripts/db-migrate.ts post`.
+Column removals and data moves go in the `pre` step (so `db push` never has to drop data), and one-off data fixes
+go in the `post` list, which is tracked in the `DataMigration` table so each runs once.
+
 | Script | Description |
 |---|---|
 | `npm run dev` | Start the API server and the Vite dev server together |
 | `npm run build` | Generate the Prisma client, sync the schema and build the web app |
 | `npm run typecheck` | Type-check the whole project |
+| `npm test` | Run the test suite (needs PostgreSQL, see below) |
 | `npm run db:studio` | Browse the database with Prisma Studio |
 
 ## Project structure
@@ -245,8 +267,10 @@ api/index.ts            Vercel Function entry point
 src/server/
   app.ts                Express app and route mounting
   api/                  auth, dashboard, public, admin, interactions, X auth, cron
-  raffle/               draw logic, requirements, embeds, X tasks, scheduling
+  raffle/               draw (resumable), entries, requirements, embeds, X tasks, scheduling, audit log
   xlsx.ts               Dependency-free Excel writer
+scripts/db-migrate.ts   Safe schema / data migrations run during the build
+tests/                  Test suite (node:test, real PostgreSQL, fake Discord)
 src/shared/             Code shared by server and web (chains, allocations, paths)
 src/web/                React frontend (pages, components, icons)
 prisma/schema.prisma    Database schema
@@ -255,11 +279,20 @@ docs/                   Logo and screenshots
 
 ## Security and privacy
 
+See the [Privacy Policy](https://skybot-raffle.vercel.app/privacy) and [Terms of Use](https://skybot-raffle.vercel.app/terms) pages in the app.
+
 - Discord interactions are verified with Ed25519 signatures; QStash and cron callbacks are signed as well.
 - Sessions use random, httpOnly cookies. Login and X sign-in redirects only accept internal paths.
 - Public pages show participants' Discord names and avatars only. Wallets, X accounts and quote links are visible to the
   raffle's hosts and managers.
-- The admin page PIN lives in an environment variable, never in code, and wrong attempts are rate limited.
+- The admin page only opens for Discord accounts listed in `ADMIN_DISCORD_IDS`; there is no PIN to guess.
+- Discord access tokens are encrypted at rest (AES-256-GCM).
+- Image links are downloaded once and stored on SkyBOT (https only, internal addresses blocked), so hosts can't log
+  visitors' IP addresses through raffle images.
+- Security headers (Content-Security-Policy, no framing) are set in `vercel.json`, and entry, wallet, upload and
+  create actions are rate limited per user.
+- The Connect X link shows which Discord account it links to before sending you to X, so a link shared by someone
+  else can't silently attach your X account to their Discord account.
 - X tasks cannot be verified through the free X API. The bot records that each task link was opened, not that the
   action was completed, so verify winners manually for high-value raffles.
 

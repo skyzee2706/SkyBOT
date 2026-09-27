@@ -44,6 +44,21 @@ export function WalletDialog({ profile, onClose, onSaved }: { profile: Profile; 
     setError(null);
   };
 
+  const remove = async () => {
+    if (!kind) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await api(`/p/me/wallet?type=${kind}`, { method: "DELETE" });
+      onSaved({ ...profile, wallets: { ...profile.wallets, [kind]: null } });
+      setKind(null);
+    } catch (err) {
+      setError((err as Error).message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const save = async (e: FormEvent) => {
     e.preventDefault();
     if (!kind) return;
@@ -114,6 +129,11 @@ export function WalletDialog({ profile, onClose, onSaved }: { profile: Profile; 
             <button className="btn btn-primary w-full" disabled={busy || !value}>
               {busy ? "Saving..." : "Save wallet"}
             </button>
+            {profile.wallets[kind] && (
+              <button type="button" onClick={remove} disabled={busy} className="w-full text-center text-xs text-red-400 hover:underline">
+                Remove this wallet
+              </button>
+            )}
           </form>
         )}
       </div>

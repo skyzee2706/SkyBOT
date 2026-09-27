@@ -1,8 +1,10 @@
 import { Router, type Response } from "express";
-import { waitUntil } from "@vercel/functions";
+import { Routes } from "discord.js";
 import { db } from "../db.js";
+import { rest } from "../discord.js";
+import { currentUser } from "./auth.js";
 import { xEnabled } from "../env.js";
-import { recordTaskClick, refreshTaskMessage } from "../raffle/service.js";
+import { recordTaskClick } from "../raffle/service.js";
 import { verifyLinkToken, verifyTaskToken, xAccessToken, xAuthorizeUrl, xRequestToken } from "../x.js";
 import { safeReturnPath } from "../../shared/raffle.js";
 
@@ -17,8 +19,20 @@ function page(res: Response, status: number, title: string, message: string) {
 <meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title>
 <style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121116;color:#f4f4f5;font:16px system-ui,sans-serif;padding:16px}
 .c{max-width:420px;text-align:center;border:1px solid #27272a;border-radius:16px;padding:32px;background:#1b1a21}
-h1{font-size:22px;margin:0 0 12px}p{color:#a1a1aa;line-height:1.5;margin:0}.i{width:48px;height:48px;margin:0 auto 16px}</style></head>
+h1{font-size:22px;margin:0 0 12px}.b{display:block;margin-top:20px;padding:12px;border-radius:10px;background:#f2963a;color:#121116;font-weight:600;text-decoration:none}p{color:#a1a1aa;line-height:1.5;margin:0}.i{width:48px;height:48px;margin:0 auto 16px}</style></head>
 <body><div class="c">${status < 300 ? ICON_OK : ICON_ERR}<h1>${esc(title)}</h1><p>${message}</p></div></body></html>`);
+}
+
+// Nama akun Discord untuk halaman konfirmasi (dari data login web, atau langsung dari Discord)
+async function discordName(id: string) {
+  const user = await db.user.findUnique({ where: { id }, select: { username: true } });
+  if (user) return user.username;
+  try {
+    const u = (await rest.get(Routes.user(id))) as { username: string; global_name?: string | null };
+    return u.global_name ?? u.username;
+  } catch {
+    return `ID ${id}`;
+  }
 }
 
 const EXPIRED = "Click <b>Connect X</b> or <b>Enter</b> again in Discord to get a new link.";
@@ -30,6 +44,25 @@ xRouter.get("/connect", async (req, res) => {
   if (!xEnabled) return page(res, 503, "X is not enabled yet", "The admin hasn't set X_API_KEY and X_API_SECRET.");
   const discordId = verifyLinkToken(String(req.query.t ?? ""));
   if (!discordId) return page(res, 400, "Link expired", EXPIRED);
+  const returnTo = safeReturnPath(req.query.r);
+
+  // Link ini menghubungkan akun X ke akun Discord di dalam link. Supaya orang tidak tertipu membuka link milik
+  // orang lain (akun X-nya jadi terhubung ke Discord si pengirim link), tampilkan dulu akun Discord tujuannya.
+  const viewer = await currentUser(req);
+  if (viewer && viewer.id !== discordId) {
+    return page(res, 403, "Wrong account", "This link belongs to a different Discord account. Use the Connect X button from your own account.");
+  }
+  if (!viewer && req.query.go !== "1") {
+    const name = await discordName(discordId);
+    const next = `/api/x/connect?${new URLSearchParams({ t: String(req.query.t), ...(returnTo ? { r: returnTo } : {}), go: "1" })}`;
+    return page(
+      res,
+      200,
+      "Connect your X account",
+      `Your X account will be linked to the Discord account <b>${esc(name)}</b>.<br>Not you? Close this page.` +
+        `<a class="b" href="${esc(next)}">Continue to X</a>`,
+    );
+  }
 
   // Bersihkan sisa login lama yang tidak selesai
   await db.xAuthState.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 3_600_000) } } });
@@ -41,7 +74,6 @@ xRouter.get("/connect", async (req, res) => {
     console.error("[x] request_token failed", e);
     return page(res, 502, "Couldn't connect to X", "Please try again in a moment. If it keeps failing, contact an admin.");
   }
-  const returnTo = safeReturnPath(req.query.r);
   await db.xAuthState.create({ data: { oauthToken: token, tokenSecret: secret, discordId, returnTo } });
   res.redirect(xAuthorizeUrl(token));
 });
@@ -90,5 +122,4 @@ xRouter.get("/task", async (req, res) => {
   const url = await recordTaskClick(click);
   if (!url) return page(res, 404, "Task unavailable", "This raffle has ended or its tasks have changed.");
   res.redirect(url);
-  waitUntil(refreshTaskMessage(click.raffleId, click.userId).catch((e) => console.error("[x] failed to update task message", e)));
 });

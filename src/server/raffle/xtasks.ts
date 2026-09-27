@@ -14,16 +14,12 @@ const xPostSchema = z.object({
   quote: z.boolean(),
 });
 
-type XFields = Pick<Raffle, "xPosts" | "xTweetId" | "xLike" | "xRetweet" | "xQuote">;
+type XFields = Pick<Raffle, "xPosts">;
 
-// Daftar post task. Raffle lama (sebelum multi-post) disimpan di kolom tunggal, jadi dikonversi di sini.
+// Daftar post task (kolom JSON divalidasi dulu; data rusak = tidak ada task)
 export function getXPosts(r: XFields): XPost[] {
   const parsed = z.array(xPostSchema).safeParse(r.xPosts);
-  if (parsed.success && parsed.data.length) return parsed.data;
-  if (r.xTweetId && (r.xLike || r.xRetweet || r.xQuote)) {
-    return [{ tweetId: r.xTweetId, like: r.xLike, retweet: r.xRetweet, quote: r.xQuote }];
-  }
-  return [];
+  return parsed.success ? parsed.data : [];
 }
 
 export const quotePosts = (r: XFields) => getXPosts(r).filter((p) => p.quote);

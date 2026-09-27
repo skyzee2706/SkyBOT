@@ -51,14 +51,14 @@ export type Raffle = {
   endedAt: string | null;
   status: RaffleStatus;
   requiredRoleIds: string[];
-  blockedRoleIds: string[];
-  requireAnyRole: boolean;
   requireMember: boolean;
   inviteUrl: string | null;
   minAccountAgeDays: number;
   walletType: "NONE" | "EVM" | "SOL" | "CUSTOM";
   winnerRoleId: string | null;
   mentionRoleIds: string[];
+  drawPending?: boolean;
+  announcePending?: boolean;
   xFollowUsernames: string[];
   xPosts: XPost[];
   createdAt: string;
@@ -86,6 +86,8 @@ export type Entry = {
   note: string | null;
   createdAt: string;
 };
+
+export type Activity = { id: string; actorId: string; actorName: string; action: string; detail: string | null; createdAt: string };
 
 export const guildIcon = (g: { id: string; icon: string | null }) =>
   g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=128` : null;

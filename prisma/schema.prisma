@@ -8,15 +8,15 @@ datasource db {
 }
 
 model User {
-  id        String    @id // Discord user ID
-  username  String
-  avatar    String?
-  createdAt DateTime  @default(now()) // pertama kali login
+  id          String    @id // Discord user ID
+  username    String
+  avatar      String?
+  createdAt   DateTime  @default(now()) // pertama kali login
   lastLoginAt DateTime?
-  sessions  Session[]
+  sessions    Session[]
 }
 
-// Percobaan login halaman /admin (untuk membatasi tebak-tebakan PIN)
+// Tabel lama (login admin pakai PIN, sudah diganti login Discord). Dihapus di deploy berikutnya.
 model AdminAttempt {
   id        String   @id @default(cuid())
   ip        String
@@ -24,6 +24,7 @@ model AdminAttempt {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+  @@ignore
 }
 
 model Session {
@@ -77,41 +78,52 @@ model Raffle {
   status      RaffleStatus @default(ACTIVE)
 
   // Requirements
-  requiredRoleIds    String[]
-  blockedRoleIds     String[]   // fitur lama (sudah dihapus dari dashboard), tetap dicek untuk raffle lama
-  // true = cukup punya SALAH SATU required role (raffle baru); false = harus punya semua (raffle lama)
-  requireAnyRole     Boolean    @default(false)
+  requiredRoleIds   String[] // peserta cukup punya SALAH SATU role ini
+  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
+  blockedRoleIds    String[]   @ignore
+  requireAnyRole    Boolean    @default(false) @ignore
   // true = peserta wajib member server (default, juga untuk semua raffle lama);
   // false = non-member boleh ikut lewat web (required role tidak bisa dipakai)
-  requireMember      Boolean    @default(true)
-  inviteUrl          String? // link invite server (opsional), jadi tombol "Join server" di web
-  minAccountAgeDays  Int        @default(0)
-  walletType         WalletType @default(NONE)
+  requireMember     Boolean    @default(true)
+  inviteUrl         String? // link invite server (opsional), jadi tombol "Join server" di web
+  minAccountAgeDays Int        @default(0)
+  walletType        WalletType @default(NONE)
 
   // Task X (tidak diverifikasi — peserta cukup klik tombol task lalu konfirmasi)
   xFollowUsernames String[]
   // Daftar post: [{ tweetId, like, retweet, quote }]. Quote = peserta wajib kirim link quote-nya.
   xPosts           Json     @default("[]")
-  // Kolom lama (1 post per raffle) — hanya dibaca untuk raffle lama, lihat getXPosts()
-  xTweetId         String?
-  xLike            Boolean  @default(false)
-  xRetweet         Boolean  @default(false)
-  xQuote           Boolean  @default(false)
+  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
+  xTweetId         String?  @ignore
+  xLike            Boolean  @default(false) @ignore
+  xRetweet         Boolean  @default(false) @ignore
+  xQuote           Boolean  @default(false) @ignore
 
-  winnerRoleId String?
+  winnerRoleId    String?
   // Di-mention saat raffle diposting. ID = guildId berarti @everyone.
-  mentionRoleIds String[]
-  createdById  String
-  createdAt    DateTime @default(now())
-  endedAt      DateTime?
+  mentionRoleIds  String[]
+  createdById     String
+  createdAt       DateTime  @default(now())
+  endedAt         DateTime?
   // Kapan jumlah peserta di embed Discord terakhir di-update (dibatasi supaya tidak kena rate limit)
   messageSyncedAt DateTime?
 
+  // Undian berjalan bertahap & bisa dilanjutkan kalau terputus (error Discord, batas waktu server):
+  // drawPending = pemenang belum lengkap diundi; announcePending = pengumuman belum terkirim.
+  // drawLockUntil mencegah dua proses mengundi raffle yang sama bersamaan.
+  drawPending     Boolean   @default(false)
+  announcePending Boolean   @default(false)
+  drawLockUntil   DateTime?
+  drawError       String? // error terakhir saat mengundi / mengumumkan (untuk halaman admin)
+
   entries      Entry[]
   taskProgress TaskProgress[]
+  auditLogs    AuditLog[]
 
   @@index([guildId])
   @@index([status, endsAt])
+  @@index([drawPending])
+  @@index([announcePending])
 }
 
 enum EntryStatus {
@@ -121,21 +133,22 @@ enum EntryStatus {
 }
 
 model Entry {
-  id        String      @id @default(cuid())
-  raffleId  String
-  raffle    Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
-  userId    String
-  username  String
-  avatar    String? // hash avatar Discord saat ikut (untuk daftar peserta publik)
-  wallet    String?
-  xUsername String?
+  id         String      @id @default(cuid())
+  raffleId   String
+  raffle     Raffle      @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  userId     String
+  username   String
+  avatar     String? // hash avatar Discord saat ikut (untuk daftar peserta publik)
+  wallet     String?
+  xUsername  String?
   // Link quote, urutannya sama dengan post ber-task quote di Raffle.xPosts
   xQuoteUrls String[]
-  xQuoteUrl  String? // kolom lama (1 quote)
-  status    EntryStatus @default(ENTERED)
+  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
+  xQuoteUrl  String?     @ignore
+  status     EntryStatus @default(ENTERED)
   allocation Allocation? // diisi saat menang (GTD / FCFS); null untuk raffle lama
-  note      String?
-  createdAt DateTime    @default(now())
+  note       String?
+  createdAt  DateTime    @default(now())
 
   @@unique([raffleId, userId])
   @@unique([raffleId, wallet])
@@ -143,26 +156,26 @@ model Entry {
   @@index([userId, createdAt]) // halaman "My entries"
 }
 
-// Akun X yang terhubung ke akun Discord (1 akun X hanya untuk 1 akun Discord)
-// Task X yang sudah dibuka peserta (lewat /api/x/task), plus token interaksi Discord
-// untuk memperbarui pesan daftar task-nya (token berlaku 15 menit).
+// Task X yang sudah dibuka peserta di web (lewat /api/x/task)
 model TaskProgress {
   raffleId         String
   raffle           Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
   userId           String
   done             String[]
-  appId            String?
-  interactionToken String?
-  tokenAt          DateTime?
+  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
+  appId            String?   @ignore
+  interactionToken String?   @ignore
+  tokenAt          DateTime? @ignore
 
   @@id([raffleId, userId])
 }
 
+// Akun X yang terhubung ke akun Discord (1 akun X hanya untuk 1 akun Discord)
 model XLink {
-  discordId  String   @id
-  xUserId    String   @unique
-  xUsername  String
-  linkedAt   DateTime @default(now())
+  discordId String   @id
+  xUserId   String   @unique
+  xUsername String
+  linkedAt  DateTime @default(now())
 }
 
 // Penyimpanan sementara selama proses login X (OAuth 1.0a)
@@ -200,4 +213,33 @@ model UserWallet {
   evm       String?  @unique
   sol       String?  @unique
   updatedAt DateTime @updatedAt
+}
+
+// Riwayat aksi host / manager per raffle (dibuat, diedit, diakhiri, dibatalkan, diskualifikasi)
+model AuditLog {
+  id        String   @id @default(cuid())
+  raffleId  String
+  raffle    Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  actorId   String // ID Discord; "system" untuk aksi otomatis
+  actorName String
+  action    String
+  detail    String?
+  createdAt DateTime @default(now())
+
+  @@index([raffleId, createdAt])
+}
+
+// Pembatas request per user / per aksi (jendela waktu tetap)
+model RateLimit {
+  key       String   @id // "<aksi>:<userId>:<awal jendela>"
+  count     Int      @default(0)
+  expiresAt DateTime
+
+  @@index([expiresAt])
+}
+
+// Migrasi data yang sudah dijalankan (lihat scripts/db-migrate.ts)
+model DataMigration {
+  id    String   @id
+  ranAt DateTime @default(now())
 }

@@ -2,8 +2,8 @@ import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder } from "disc
 import type { Raffle } from "@prisma/client";
 import { ALLOCATIONS, allocationCount, chainLabel, hasAllocations, publicRafflePath, walletName } from "../../shared/raffle.js";
 import { env } from "../env.js";
-import { taskClickUrl, tweetUrl } from "../x.js";
-import { getXPosts, hasXTasks, quotePosts, xTaskList } from "./xtasks.js";
+import { tweetUrl } from "../x.js";
+import { getXPosts, hasXTasks } from "./xtasks.js";
 
 export { hasXTasks };
 
@@ -36,10 +36,9 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
   const ended = raffle.status !== "ACTIVE";
   const reqs: string[] = [];
   if (raffle.requiredRoleIds.length) {
-    const roles = raffle.requiredRoleIds.map((id) => `<@&${id}>`).join(raffle.requireAnyRole ? " or " : ", ");
-    reqs.push(`${raffle.requireAnyRole && raffle.requiredRoleIds.length > 1 ? "Have one of these roles" : "Required role"}: ${roles}`);
+    const roles = raffle.requiredRoleIds.map((id) => `<@&${id}>`).join(" or ");
+    reqs.push(`${raffle.requiredRoleIds.length > 1 ? "Have one of these roles" : "Required role"}: ${roles}`);
   }
-  if (raffle.blockedRoleIds.length) reqs.push(`Blocked role: ${raffle.blockedRoleIds.map((id) => `<@&${id}>`).join(", ")}`);
   if (!raffle.requireMember) reqs.push("🌐 Open to non-members (enter on the web page)");
   if (raffle.minAccountAgeDays) reqs.push(`Discord account age ≥ ${raffle.minAccountAgeDays} days`);
   if (hasXTasks(raffle)) reqs.push("Connect your X account", ...xTaskLines(raffle));
@@ -122,41 +121,6 @@ export function raffleButtons(raffle: Raffle) {
 }
 
 const link = (label: string, url: string) => new ButtonBuilder().setStyle(ButtonStyle.Link).setLabel(label).setURL(url);
-
-// Tombol task X (maks 5 per baris) + tombol konfirmasi.
-// Task yang belum dibuka = tombol link abu-abu; yang sudah = tombol hijau ✅ (nonaktif).
-// "Done, enter me" baru bisa diklik setelah semua task dibuka.
-export function xTaskComponents(raffle: Raffle, userId: string, done: ReadonlySet<string>) {
-  const list = xTaskList(raffle);
-  const tasks = list.map((t) =>
-    done.has(t.key)
-      ? new ButtonBuilder()
-          .setCustomId(`raffle:done:${raffle.id}:${t.key}`)
-          .setLabel(`✅ ${t.label.replace(/^(❤️|🔁|💬) /u, "")}`.slice(0, 80))
-          .setStyle(ButtonStyle.Success)
-          .setDisabled(true)
-      : link(t.label.slice(0, 80), taskClickUrl({ raffleId: raffle.id, userId, task: t.key })),
-  );
-  const allDone = list.every((t) => done.has(t.key));
-
-  // Maks 4 baris tombol task (20 tombol) + 1 baris konfirmasi = batas 5 baris Discord
-  const rows: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let i = 0; i < tasks.length; i += 5) {
-    rows.push(new ActionRowBuilder<ButtonBuilder>().addComponents(tasks.slice(i, i + 5)));
-  }
-  const quoteCount = quotePosts(raffle).length;
-  rows.push(
-    new ActionRowBuilder<ButtonBuilder>().addComponents(
-      new ButtonBuilder()
-        // Q<n> = form perlu n link quote
-        .setCustomId(`raffle:confirm:${raffle.id}:${raffle.walletType}:${quoteCount ? `Q${quoteCount}` : "-"}`)
-        .setLabel(allDone ? "✅ Done, enter me" : "🔒 Done, enter me")
-        .setStyle(allDone ? ButtonStyle.Primary : ButtonStyle.Secondary)
-        .setDisabled(!allDone),
-    ),
-  );
-  return rows.map((r) => r.toJSON());
-}
 
 export const connectXComponents = (url: string, label = "Connect X account") => [
   new ActionRowBuilder<ButtonBuilder>().addComponents(link(label, url)).toJSON(),

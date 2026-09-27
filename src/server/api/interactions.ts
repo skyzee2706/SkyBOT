@@ -219,18 +219,17 @@ interactionsRouter.post("/", async (req, res) => {
   } else if (isButton && action === "enter") {
     work = () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "confirm") {
-    // Tombol ada di pesan daftar task (ephemeral) — hasilnya menggantikan pesan itu.
+    // Tombol Continue (ephemeral) tanpa isian form — hasilnya menggantikan pesan itu.
     updateSameMessage = true;
     work = () => enterRaffle(raffleId, entrantOf(gi));
   } else if (isButton && action === "status") {
     work = () => entryStatus(raffleId, gi.member.user.id);
   } else if (isButton && action === "connectx") {
     work = () => connectXReply(gi.member.user.id);
-  } else if (i.type === InteractionType.ModalSubmit && (action === "submit" || action === "wallet")) {
+  } else if (i.type === InteractionType.ModalSubmit && action === "submit") {
     const fields = (gi as APIModalSubmitInteraction).data.components;
     const wallet = findInputValue(fields, "wallet");
     const quoteUrls = [1, 2, 3, 4, 5].map((n) => findInputValue(fields, `quote${n}`));
-    quoteUrls[0] ??= findInputValue(fields, "quote"); // form versi lama
     work = () => enterRaffle(raffleId, entrantOf(gi), { wallet, quoteUrls });
   }
 

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
-import { api, type Entry, type Raffle } from "../api";
+import { api, type Activity, type Entry, type Raffle } from "../api";
+import { EditRaffleDialog } from "./EditRaffle";
 import { ErrorBox, formatDate, Loading, Pagination, StatusBadge } from "../components";
 import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
 import { ArrowLeft, ExternalLink, Globe, Trophy, Users } from "lucide-react";
@@ -19,7 +20,8 @@ const PAGE_SIZE = 20;
 
 export function RafflePage() {
   const { id } = useParams();
-  const [data, setData] = useState<{ raffle: Raffle; entries: Entry[] } | null>(null);
+  const [data, setData] = useState<{ raffle: Raffle; entries: Entry[]; activity: Activity[] } | null>(null);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("ALL");
@@ -30,9 +32,16 @@ export function RafflePage() {
   const [confirm, setConfirm] = useState<null | "end" | "cancel">(null);
 
   const load = useCallback(() => {
-    api<{ raffle: Raffle; entries: Entry[] }>(`/raffles/${id}`).then(setData).catch((e) => setError(e.message));
+    api<{ raffle: Raffle; entries: Entry[]; activity: Activity[] }>(`/raffles/${id}`).then(setData).catch((e) => setError(e.message));
   }, [id]);
   useEffect(load, [load]);
+  // Selama undian berjalan di belakang layar, muat ulang tiap 3 detik sampai selesai
+  const drawing = !!(data?.raffle.drawPending || data?.raffle.announcePending);
+  useEffect(() => {
+    if (!drawing) return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [drawing, load]);
 
   // Link lama (/r/:id) atau server ID yang salah → alamat yang benar: /manage/:serverId/raffle/:id
   const { pathname } = useLocation();
@@ -57,7 +66,7 @@ export function RafflePage() {
   };
 
   if (!data) return error ? <ErrorBox error={error} /> : <Loading />;
-  const { raffle, entries } = data;
+  const { raffle, entries, activity } = data;
   const posts = raffle.xPosts;
   const hasX = raffle.xFollowUsernames.length > 0 || posts.length > 0;
   const quoteCount = posts.filter((p) => p.quote).length;
@@ -167,7 +176,19 @@ export function RafflePage() {
         </div>
       </div>
 
+      {drawing && (
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-brand-500/40 bg-brand-500/10 px-4 py-3 text-sm text-brand-100">
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-brand-300 border-t-transparent" />
+          Drawing winners… This page updates automatically.
+        </div>
+      )}
+
       <div className="mb-6 flex flex-wrap gap-2">
+        {raffle.status === "ACTIVE" && !confirm && (
+          <button className="btn btn-ghost" disabled={busy} onClick={() => setEditing(true)}>
+            Edit
+          </button>
+        )}
         {raffle.status === "ACTIVE" &&
           (confirm ? (
             <div className="flex items-center gap-2 rounded-lg border border-zinc-700 px-3 py-1.5 text-sm">
@@ -272,7 +293,15 @@ export function RafflePage() {
                         <button
                           className="text-xs text-red-400 hover:underline disabled:opacity-50"
                           disabled={busy}
-                          onClick={() => act(`/entries/${e.id}/disqualify`)}
+                          onClick={() => {
+                            const replace = e.status === "WON" && raffle.status === "ENDED";
+                            const ok = window.confirm(
+                              replace
+                                ? `Disqualify ${e.username}? A replacement winner will be drawn and announced in Discord.`
+                                : `Disqualify ${e.username}?`,
+                            );
+                            if (ok) act(`/entries/${e.id}/disqualify`);
+                          }}
                         >
                           Disqualify
                         </button>
@@ -286,6 +315,43 @@ export function RafflePage() {
           </div>
         )}
       </div>
+
+      {activity.length > 0 && (
+        <div className="card mt-6">
+          <h2 className="mb-3 font-semibold">Activity</h2>
+          <ul className="space-y-2 text-sm">
+            {activity.map((a) => (
+              <li key={a.id} className="flex flex-wrap items-baseline gap-x-2">
+                <span className="text-xs text-zinc-500">{formatDate(a.createdAt)}</span>
+                <span className="font-medium text-zinc-200">{a.actorName}</span>
+                <span className="text-zinc-400">{ACTIVITY_LABEL[a.action] ?? a.action}</span>
+                {a.detail && <span className="break-all text-xs text-zinc-500">{a.detail}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {editing && (
+        <EditRaffleDialog
+          raffle={raffle}
+          onClose={() => setEditing(false)}
+          onSaved={() => {
+            setEditing(false);
+            load();
+          }}
+        />
+      )}
     </div>
   );
 }
+
+const ACTIVITY_LABEL: Record<string, string> = {
+  created: "created the raffle",
+  edited: "edited",
+  ended: "ended the raffle early",
+  cancelled: "cancelled the raffle",
+  disqualified: "disqualified",
+  drawn: "drew the winners",
+  replacement: "drew a replacement winner",
+};

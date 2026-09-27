@@ -1,3 +1,4 @@
+import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import QRCode from "qrcode";
 import { Check, Copy, Heart } from "lucide-react";
@@ -112,7 +113,15 @@ export function Footer() {
     <footer className="border-t border-brand-500/15">
       <div className="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-3 px-4 py-5">
         <CreatorCredit />
-        <DonateButton />
+        <div className="flex items-center gap-4">
+          <Link to="/privacy" className="text-sm text-zinc-500 hover:text-zinc-300">
+            Privacy
+          </Link>
+          <Link to="/terms" className="text-sm text-zinc-500 hover:text-zinc-300">
+            Terms
+          </Link>
+          <DonateButton />
+        </div>
       </div>
     </footer>
   );

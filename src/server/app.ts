@@ -11,7 +11,6 @@ import { xRouter } from "./api/xauth.js";
 
 const app = express();
 app.disable("x-powered-by");
-app.set("trust proxy", true);
 
 // Route ini butuh body mentah untuk verifikasi tanda tangan, jadi dipasang sebelum parser JSON.
 app.use("/api/interactions", interactionsRouter);

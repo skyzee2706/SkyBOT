@@ -1,81 +1,28 @@
-import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { Router, type Request, type Response, type NextFunction } from "express";
 import { db } from "../db.js";
 import { fetchBotGuilds } from "../discord.js";
 import { env } from "../env.js";
 import { allocationSummary, chainLabel } from "../../shared/raffle.js";
+import { currentUser } from "./auth.js";
 import { HttpError } from "./dashboard.js";
 
-// Halaman /admin: statistik pemakaian SkyBOT. Login pakai PIN dari env ADMIN_PIN (bukan di kode,
-// karena repo bisa dibaca orang lain). Tebakan PIN dibatasi per IP dan secara global.
+// Halaman /admin: statistik pemakaian SkyBOT. Hanya untuk akun Discord yang ID-nya ada di env ADMIN_DISCORD_IDS
+// (login Discord biasa). Tidak ada PIN yang bisa ditebak atau dipakai untuk mengunci pemilik.
 
-const SESSION_MS = 12 * 3_600_000;
-const WINDOW_MS = 15 * 60_000;
-const MAX_FAILS_PER_IP = 5;
-const MAX_FAILS_GLOBAL = 30; // total semua IP dalam 15 menit — menahan tebakan dari banyak IP sekaligus
-const COOKIE = "admin";
-const secure = env.PUBLIC_URL.startsWith("https://");
+const adminIds = () => new Set((env.ADMIN_DISCORD_IDS ?? "").split(/[\s,]+/).filter(Boolean));
 
-// Kunci ikut PIN: ganti ADMIN_PIN = semua sesi admin lama otomatis tidak berlaku
-const sessionKey = () => createHmac("sha256", env.DISCORD_CLIENT_SECRET).update(`admin:${env.ADMIN_PIN}`).digest();
-const sign = (exp: number) => createHmac("sha256", sessionKey()).update(String(exp)).digest("base64url");
-
-function validSession(token: string | undefined) {
-  const [exp, sig] = (token ?? "").split(".");
-  if (!exp || !sig || Number(exp) < Date.now()) return false;
-  const a = Buffer.from(sig, "base64url");
-  const b = Buffer.from(sign(Number(exp)), "base64url");
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-const sha = (s: string) => createHash("sha256").update(s).digest();
-const pinMatches = (pin: string) => timingSafeEqual(sha(pin), sha(env.ADMIN_PIN!));
-
-function requireEnabled() {
-  if (!env.ADMIN_PIN) throw new HttpError(503, "The admin page is disabled. Set ADMIN_PIN in Vercel to enable it.");
-}
-
-function requireAdmin(req: Request, _res: Response, next: NextFunction) {
-  requireEnabled();
-  if (!validSession(req.cookies[COOKIE])) throw new HttpError(401, "Please enter the PIN.");
+async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
+  const user = await currentUser(req);
+  // 404 (bukan 403) supaya halaman ini tidak terlihat ada bagi yang bukan admin
+  if (!user || !adminIds().has(user.id)) throw new HttpError(404, "Not found");
   next();
 }
 
 export const adminRouter = Router();
 
-adminRouter.get("/session", (req, res) => {
-  res.json({ enabled: !!env.ADMIN_PIN, loggedIn: !!env.ADMIN_PIN && validSession(req.cookies[COOKIE]) });
-});
-
-adminRouter.post("/login", async (req, res) => {
-  requireEnabled();
-  const ip = req.ip ?? "unknown";
-  const since = new Date(Date.now() - WINDOW_MS);
-  await db.adminAttempt.deleteMany({ where: { createdAt: { lt: new Date(Date.now() - 86_400_000) } } });
-  const [ipFails, allFails] = await Promise.all([
-    db.adminAttempt.count({ where: { ip, ok: false, createdAt: { gte: since } } }),
-    db.adminAttempt.count({ where: { ok: false, createdAt: { gte: since } } }),
-  ]);
-  if (ipFails >= MAX_FAILS_PER_IP || allFails >= MAX_FAILS_GLOBAL) {
-    throw new HttpError(429, "Too many wrong PINs. Try again in 15 minutes.");
-  }
-
-  const pin = typeof req.body?.pin === "string" ? req.body.pin.trim() : "";
-  const ok = pin.length > 0 && pinMatches(pin);
-  await db.adminAttempt.create({ data: { ip, ok } });
-  if (!ok) {
-    const left = MAX_FAILS_PER_IP - ipFails - 1;
-    throw new HttpError(401, left > 0 ? `Wrong PIN. ${left} attempt${left === 1 ? "" : "s"} left.` : "Wrong PIN. Locked for 15 minutes.");
-  }
-
-  const exp = Date.now() + SESSION_MS;
-  res.cookie(COOKIE, `${exp}.${sign(exp)}`, { httpOnly: true, sameSite: "strict", secure, path: "/api/admin", expires: new Date(exp) });
-  res.json({ ok: true });
-});
-
-adminRouter.post("/logout", (_req, res) => {
-  res.clearCookie(COOKIE, { path: "/api/admin" });
-  res.json({ ok: true });
+adminRouter.get("/session", async (req, res) => {
+  const user = await currentUser(req);
+  res.json({ enabled: adminIds().size > 0, loggedIn: !!user, isAdmin: !!user && adminIds().has(user.id) });
 });
 
 adminRouter.get("/stats", requireAdmin, async (_req, res) => {
@@ -144,6 +91,13 @@ adminRouter.get("/stats", requireAdmin, async (_req, res) => {
     })
     .sort((a, b) => b.raffles - a.raffles || (a.name ?? "").localeCompare(b.name ?? ""));
 
+  // Undian yang belum selesai / gagal (normalnya kosong; dilanjutkan otomatis)
+  const attention = await db.raffle.findMany({
+    where: { OR: [{ drawPending: true }, { announcePending: true }, { NOT: { drawError: null } }], status: "ENDED" },
+    select: { id: true, title: true, guildId: true, guildName: true, endedAt: true, drawPending: true, announcePending: true, drawError: true },
+    orderBy: { endedAt: "desc" },
+    take: 50,
+  });
   const byStatus = Object.fromEntries(statusCounts.map((s) => [s.status, s._count._all]));
   res.json({
     totals: {
@@ -158,6 +112,7 @@ adminRouter.get("/stats", requireAdmin, async (_req, res) => {
       communities: botGuilds ? botGuilds.length : null,
       communitiesWithRaffles: perGuild.size,
     },
+    attention,
     communities,
     users: users.map((u) => ({
       id: u.id,
