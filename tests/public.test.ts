@@ -84,7 +84,15 @@ describe("link preview", () => {
     const html = await (await fetch(`${server.base}/raffle/${r.id}`)).text();
     assert.match(html, /<meta property="og:title" content="Nebula &#60;Pass&#62; · Nebula Labs" \/>/);
     assert.match(html, /<meta property="og:description" content="GTD 20 · FCFS 50 · Base · Ends Sep 30, 2026" \/>/);
-    assert.match(html, /og:image" content="https:\/\/skybot.test\/api\/images\/abc"/);
+    assert.match(html, new RegExp(`og:image" content="https://skybot.test/api/og/raffle/${r.id}.png\\?v=`));
+
+    // Kartu preview bertema SkyBOT (PNG 1200×630), bukan gambar raffle
+    const img = await fetch(`${server.base}/api/og/raffle/${r.id}.png`);
+    assert.equal(img.headers.get("content-type"), "image/png");
+    const png = Buffer.from(await img.arrayBuffer());
+    assert.equal(png.subarray(1, 4).toString(), "PNG");
+    assert.equal(png.readUInt32BE(16), 1200);
+    assert.equal(png.readUInt32BE(20), 630);
     assert.equal(html.match(/property="og:title"/g)?.length, 1, "generic tags replaced, not duplicated");
     assert.match(html, /<script type="module"/, "the app still loads");
   });

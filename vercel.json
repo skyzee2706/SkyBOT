@@ -5,7 +5,7 @@
   "functions": {
     "api/index.ts": {
       "maxDuration": 60,
-      "includeFiles": "dist/web/index.html"
+      "includeFiles": "{dist/web/index.html,src/server/assets/**}"
     }
   },
   "headers": [

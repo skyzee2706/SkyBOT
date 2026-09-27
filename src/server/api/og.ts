@@ -3,6 +3,7 @@ import { Router } from "express";
 import { db } from "../db.js";
 import { env } from "../env.js";
 import { allocationSummary, chainLabel, publicRafflePath } from "../../shared/raffle.js";
+import { raffleOgImage } from "../ogImage.js";
 
 // Preview link per raffle (Discord, X, Telegram, ...): judul raffle, allocation, chain, status & gambarnya.
 // Web ini SPA (satu index.html untuk semua halaman), jadi /raffle/:id diarahkan ke sini (lihat vercel.json):
@@ -58,7 +59,6 @@ ogRouter.get("/raffle/:id", async (req, res) => {
     select: {
       id: true,
       title: true,
-      imageUrl: true,
       status: true,
       endsAt: true,
       endedAt: true,
@@ -83,8 +83,20 @@ ogRouter.get("/raffle/:id", async (req, res) => {
     withMeta(html, {
       title: raffle.guildName ? `${raffle.title} · ${raffle.guildName}` : raffle.title,
       description,
-      image: raffle.imageUrl?.startsWith("https://") ? raffle.imageUrl : `${env.PUBLIC_URL}/og.png`,
+      // Kartu bertema SkyBOT (bukan gambar raffle). ?v= berubah saat status / waktu selesai berubah,
+      // supaya Discord & X mengambil gambar baru, bukan cache lama.
+      image: `${env.PUBLIC_URL}/api/og/raffle/${raffle.id}.png?v=${raffle.status[0]}${raffle.endsAt.getTime().toString(36)}`,
       url: `${env.PUBLIC_URL}${publicRafflePath(raffle.id)}`,
     }),
   );
+});
+
+// Gambar kartu preview (PNG 1200×630)
+ogRouter.get("/api/og/raffle/:id.png", async (req, res) => {
+  const raffle = await db.raffle.findUnique({ where: { id: String(req.params.id) } });
+  if (!raffle || raffle.status === "CANCELLED") return void res.redirect(302, "/og.png");
+  const png = await raffleOgImage(raffle);
+  res.setHeader("Content-Type", "image/png");
+  res.setHeader("Cache-Control", "public, max-age=3600, s-maxage=86400");
+  res.send(png);
 });
