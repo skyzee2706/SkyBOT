@@ -291,8 +291,8 @@ See the [Privacy Policy](https://skybot-raffle.vercel.app/privacy) and [Terms of
   visitors' IP addresses through raffle images.
 - Security headers (Content-Security-Policy, no framing) are set in `vercel.json`, and entry, wallet, upload and
   create actions are rate limited per user.
-- The Connect X link shows which Discord account it links to before sending you to X, so a link shared by someone
-  else can't silently attach your X account to their Discord account.
+- Connect X links are signed, expire after 30 minutes, and are refused when the browser is logged in to a different
+  Discord account.
 - X tasks cannot be verified through the free X API. The bot records that each task link was opened, not that the
   action was completed, so verify winners manually for high-value raffles.
 

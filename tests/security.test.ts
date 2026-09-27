@@ -46,16 +46,11 @@ describe("rate limits", () => {
 });
 
 describe("Connect X link", () => {
-  test("shows which Discord account will be linked, and refuses someone else's link", async () => {
+  test("goes straight to X, but refuses a link that belongs to another logged-in account", async () => {
     const owner = snowflake();
-    await db.user.create({ data: { id: owner, username: "rightful" } });
     const url = `${server.base}/api/x/connect?t=${encodeURIComponent(createLinkToken(owner))}`;
-    const page = await (await fetch(url)).text();
-    assert.match(page, /rightful/);
-    assert.match(page, /Continue to X/);
-
     const intruder = await login(snowflake());
-    const res = await fetch(url, { headers: intruder });
+    const res = await fetch(url, { headers: intruder, redirect: "manual" });
     assert.equal(res.status, 403);
   });
 });
