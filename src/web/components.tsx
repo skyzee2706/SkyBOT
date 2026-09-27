@@ -31,7 +31,7 @@ export function Field({
 }: {
   label: string;
   hint?: string;
-  required?: boolean; // tampilkan * merah
+  required?: boolean; // tampilkan * oranye (warna tema)
   error?: string; // border merah + pesan di bawah field
   children: ReactNode;
 }) {
@@ -39,7 +39,7 @@ export function Field({
     <div data-invalid={error ? true : undefined} className={error ? "[&_.input]:border-red-500" : undefined}>
       <label className="label">
         {label}
-        {required && <span className="ml-0.5 text-red-500">*</span>}
+        {required && <span className="ml-0.5 text-brand-400">*</span>}
       </label>
       {children}
       {error ? <p className="mt-1 text-xs text-red-400">{error}</p> : hint && <p className="hint">{hint}</p>}
