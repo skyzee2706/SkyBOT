@@ -27,15 +27,16 @@ export function CreateRafflePage() {
     imageUrl: "",
     channelId: "",
     // Allocations: centang GTD dan/atau FCFS, masing-masing dengan jumlah slot
-    gtd: { on: true, count: 1 },
-    fcfs: { on: false, count: 1 },
+    // Angka disimpan sebagai teks supaya kolomnya bisa dikosongkan saat mengetik ulang
+    gtd: { on: true, count: "1" },
+    fcfs: { on: false, count: "1" },
     chain: "" as "" | ChainId | typeof OTHER, // wajib
     customChain: "", // diisi kalau pilih "Other"
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
     requireMember: true, // peserta wajib member server
     inviteUrl: "",
-    minAccountAgeDays: 0,
+    minAccountAgeDays: "0",
     winnerRoleId: "",
     mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
@@ -48,7 +49,8 @@ export function CreateRafflePage() {
     setErrors((e) => (e[key] ? { ...e, [key]: undefined } : e));
   };
   const chainValue = form.chain === OTHER ? normalizeChain(form.customChain) : form.chain;
-  const allocationTotal = () => (form.gtd.on ? form.gtd.count : 0) + (form.fcfs.on ? form.fcfs.count : 0);
+  const spots = (v: { on: boolean; count: string }) => (v.on ? Number(v.count) || 0 : 0);
+  const allocationTotal = () => spots(form.gtd) + spots(form.fcfs);
 
   // Field wajib: kosong = tidak bisa dikirim ke Discord, field-nya ditandai merah.
   const validate = () => {
@@ -63,8 +65,9 @@ export function CreateRafflePage() {
     else if (form.chain === OTHER && !form.customChain.trim()) e.chain = "Type the chain name";
     const picked = ALLOCATIONS.filter((a) => form[a === "GTD" ? "gtd" : "fcfs"].on);
     const bad = picked.find((a) => {
-      const n = form[a === "GTD" ? "gtd" : "fcfs"].count;
-      return !Number.isInteger(n) || n < 1;
+      const raw = form[a === "GTD" ? "gtd" : "fcfs"].count.trim();
+      const n = Number(raw);
+      return !raw || !Number.isInteger(n) || n < 1;
     });
     if (!picked.length) e.allocations = "Choose GTD, FCFS, or both";
     else if (bad) e.allocations = `${bad} needs at least 1 spot`;
@@ -102,8 +105,9 @@ export function CreateRafflePage() {
           ...rest,
           chain: chainValue,
           inviteUrl: form.requireMember ? form.inviteUrl.trim() : "",
-          gtdCount: gtd.on ? gtd.count : 0,
-          fcfsCount: fcfs.on ? fcfs.count : 0,
+          gtdCount: spots(gtd),
+          fcfsCount: spots(fcfs),
+          minAccountAgeDays: Math.max(0, Math.floor(Number(form.minAccountAgeDays) || 0)),
           endsAt: new Date(form.endsAt).toISOString(),
           xFollowUsernames: x.follows.map(cleanUsername).filter(Boolean),
           xPosts: x.posts,
@@ -215,7 +219,7 @@ export function CreateRafflePage() {
                       className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 disabled:opacity-40"
                       value={v.count}
                       disabled={!v.on}
-                      onChange={(e) => set(key, { ...v, count: Number(e.target.value) })}
+                      onChange={(e) => set(key, { ...v, count: e.target.value })}
                     />
                     <span className="text-xs text-zinc-500">spots</span>
                   </label>
@@ -293,7 +297,7 @@ export function CreateRafflePage() {
               min={0}
               className="input sm:max-w-xs"
               value={form.minAccountAgeDays}
-              onChange={(e) => set("minAccountAgeDays", Number(e.target.value))}
+              onChange={(e) => set("minAccountAgeDays", e.target.value)}
             />
           </Field>
           <p className="hint">Role requirements are checked on entry AND re-checked when winners are drawn.</p>
