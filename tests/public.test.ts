@@ -97,6 +97,13 @@ describe("link preview", () => {
     assert.match(html, /<script type="module"/, "the app still loads");
   });
 
+  test("the manager page link shows the same raffle preview", async () => {
+    const r = await makeRaffle({ title: "Manager Link Raffle" });
+    const html = await (await fetch(`${server.base}/manage/${r.guildId}/raffle/${r.id}`)).text();
+    assert.match(html, /og:title" content="Manager Link Raffle/);
+    assert.match(html, /<script type="module"/);
+  });
+
   test("unknown raffles fall back to the default preview", async () => {
     const html = await (await fetch(`${server.base}/raffle/does-not-exist`)).text();
     assert.match(html, /og:image" content="https:\/\/skybot-raffle.vercel.app\/og.png"/);

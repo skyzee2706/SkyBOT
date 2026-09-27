@@ -41,6 +41,10 @@
       "destination": "/api"
     },
     {
+      "source": "/manage/:guildId/raffle/:id",
+      "destination": "/api"
+    },
+    {
       "source": "/api/(.*)",
       "destination": "/api"
     },
