@@ -28,15 +28,15 @@ export function CreateRafflePage() {
     channelId: "",
     // Allocations: centang GTD dan/atau FCFS, masing-masing dengan jumlah slot
     // Angka disimpan sebagai teks supaya kolomnya bisa dikosongkan saat mengetik ulang
-    gtd: { on: true, count: "1" },
-    fcfs: { on: false, count: "1" },
+    gtd: { on: true, count: "" },
+    fcfs: { on: false, count: "" },
     chain: "" as "" | ChainId | typeof OTHER, // wajib
     customChain: "", // diisi kalau pilih "Other"
     endsAt: toLocalInput(new Date(Date.now() + 24 * 3_600_000)),
     requiredRoleIds: [] as string[],
     requireMember: true, // peserta wajib member server
     inviteUrl: "",
-    minAccountAgeDays: "0",
+    minAccountAgeDays: "", // kosong = tanpa batas
     winnerRoleId: "",
     mentionRoleIds: [guildId!] as string[], // default: @everyone
     x: emptyXTasks as XTasksValue,
@@ -216,6 +216,7 @@ export function CreateRafflePage() {
                       min={1}
                       max={1000}
                       aria-label={`${a} spots`}
+                      placeholder="0"
                       className="w-full rounded-md border border-zinc-700 bg-zinc-900 px-2 py-1 disabled:opacity-40"
                       value={v.count}
                       disabled={!v.on}
@@ -296,6 +297,7 @@ export function CreateRafflePage() {
               type="number"
               min={0}
               className="input sm:max-w-xs"
+              placeholder="0"
               value={form.minAccountAgeDays}
               onChange={(e) => set("minAccountAgeDays", e.target.value)}
             />
