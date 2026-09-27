@@ -16,17 +16,6 @@ model User {
   sessions    Session[]
 }
 
-// Tabel lama (login admin pakai PIN, sudah diganti login Discord). Dihapus di deploy berikutnya.
-model AdminAttempt {
-  id        String   @id @default(cuid())
-  ip        String
-  ok        Boolean
-  createdAt DateTime @default(now())
-
-  @@index([createdAt])
-  @@ignore
-}
-
 model Session {
   id          String   @id
   userId      String
@@ -79,9 +68,6 @@ model Raffle {
 
   // Requirements
   requiredRoleIds   String[] // peserta cukup punya SALAH SATU role ini
-  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
-  blockedRoleIds    String[]   @ignore
-  requireAnyRole    Boolean    @default(false) @ignore
   // true = peserta wajib member server (default, juga untuk semua raffle lama);
   // false = non-member boleh ikut lewat web (required role tidak bisa dipakai)
   requireMember     Boolean    @default(true)
@@ -93,11 +79,6 @@ model Raffle {
   xFollowUsernames String[]
   // Daftar post: [{ tweetId, like, retweet, quote }]. Quote = peserta wajib kirim link quote-nya.
   xPosts           Json     @default("[]")
-  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
-  xTweetId         String?  @ignore
-  xLike            Boolean  @default(false) @ignore
-  xRetweet         Boolean  @default(false) @ignore
-  xQuote           Boolean  @default(false) @ignore
 
   winnerRoleId    String?
   // Di-mention saat raffle diposting. ID = guildId berarti @everyone.
@@ -143,8 +124,6 @@ model Entry {
   xUsername  String?
   // Link quote, urutannya sama dengan post ber-task quote di Raffle.xPosts
   xQuoteUrls String[]
-  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
-  xQuoteUrl  String?     @ignore
   status     EntryStatus @default(ENTERED)
   allocation Allocation? // diisi saat menang (GTD / FCFS); null untuk raffle lama
   note       String?
@@ -158,14 +137,10 @@ model Entry {
 
 // Task X yang sudah dibuka peserta di web (lewat /api/x/task)
 model TaskProgress {
-  raffleId         String
-  raffle           Raffle    @relation(fields: [raffleId], references: [id], onDelete: Cascade)
-  userId           String
-  done             String[]
-  // Kolom lama (tidak dipakai kode, @ignore). Dihapus dari database di deploy berikutnya, setelah versi ini live.
-  appId            String?   @ignore
-  interactionToken String?   @ignore
-  tokenAt          DateTime? @ignore
+  raffleId String
+  raffle   Raffle   @relation(fields: [raffleId], references: [id], onDelete: Cascade)
+  userId   String
+  done     String[]
 
   @@id([raffleId, userId])
 }

@@ -10,6 +10,9 @@ import { PrismaClient } from "@prisma/client";
 const db = new PrismaClient();
 const phase = process.argv[2];
 
+const tableExists = async (table: string) =>
+  (await db.$queryRaw<unknown[]>`select 1 from information_schema.tables where table_schema = current_schema() and table_name = ${table}`)
+    .length > 0;
 const columnExists = async (table: string, column: string) =>
   (
     await db.$queryRaw<unknown[]>`select 1 from information_schema.columns
@@ -34,9 +37,24 @@ async function pre() {
       where "xQuoteUrl" is not null and cardinality("xQuoteUrls") = 0`);
     console.log(`[migrate] moved ${n} legacy quote links into xQuoteUrls`);
   }
-  // Kolom & tabel lama lainnya (blockedRoleIds, requireAnyRole, token pesan task Discord, AdminAttempt) masih
-  // ada di database tapi di-@ignore di schema. Menghapusnya menunggu deploy berikutnya: kalau dihapus sekarang,
-  // versi lama yang masih melayani request selama build akan error karena masih membaca kolom itu.
+  // 3. Kolom & tabel lama yang sudah tidak dipakai kode (dihapus setelah versi yang mengabaikannya live)
+  const legacyColumns: [string, string[]][] = [
+    ["Raffle", ["xTweetId", "xLike", "xRetweet", "xQuote", "blockedRoleIds", "requireAnyRole"]],
+    ["Entry", ["xQuoteUrl"]],
+    ["TaskProgress", ["appId", "interactionToken", "tokenAt"]],
+  ];
+  for (const [table, columns] of legacyColumns) {
+    for (const column of columns) {
+      if (await columnExists(table, column)) {
+        await db.$executeRawUnsafe(`alter table "${table}" drop column "${column}"`);
+        console.log(`[migrate] dropped ${table}.${column}`);
+      }
+    }
+  }
+  if (await tableExists("AdminAttempt")) {
+    await db.$executeRawUnsafe(`drop table "AdminAttempt"`);
+    console.log("[migrate] dropped AdminAttempt");
+  }
 }
 
 // Perbaikan data sekali jalan. Tambahkan yang baru di akhir; jangan ubah / hapus yang sudah ada.
