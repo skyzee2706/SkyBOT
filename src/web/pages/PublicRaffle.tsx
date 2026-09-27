@@ -206,7 +206,6 @@ export function PublicRafflePage() {
               </a>
             )}
           </div>
-          <Participants raffleId={r.id} ended={r.status === "ENDED"} total={r.entryCount} />
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
@@ -217,6 +216,10 @@ export function PublicRafflePage() {
           )}
           <EntryPanel data={data} reload={load} />
         </div>
+      </div>
+      {/* Daftar participant selalu paling bawah (di HP juga, setelah panel Enter) */}
+      <div className="mt-6">
+        <Participants raffleId={r.id} ended={r.status === "ENDED"} total={r.entryCount} />
       </div>
     </>
   );
@@ -509,7 +512,7 @@ function Participants({ raffleId, ended, total }: { raffleId: string; ended: boo
       ) : rows.length === 0 ? (
         <p className="text-sm text-zinc-500">No one has entered yet. Be the first!</p>
       ) : (
-        <div className={`grid gap-2 transition-opacity sm:grid-cols-2 ${busy ? "opacity-50" : ""}`}>
+        <div className={`grid gap-2 transition-opacity sm:grid-cols-2 lg:grid-cols-4 ${busy ? "opacity-50" : ""}`}>
           {rows.map((e) => (
             <div
               key={e.id}
