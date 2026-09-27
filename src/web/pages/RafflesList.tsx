@@ -32,19 +32,25 @@ export function timeLeft(iso: string, now: number) {
   return `${s}s`;
 }
 
-const SORTS = [
+const LIVE_SORTS = [
   { value: "ending", label: "Ending soon" },
   { value: "newest", label: "Newest" },
   { value: "popular", label: "Most entries" },
   { value: "odds", label: "Best odds" },
 ];
+const ENDED_SORTS = [
+  { value: "recent", label: "Recently ended" },
+  { value: "popular", label: "Most entries" },
+];
 
-// Daftar raffle yang sedang live dari semua server, dengan filter untuk pemburu WL.
-// 10 per halaman; semua filter & nomor halaman disimpan di URL supaya bisa dibagikan.
+// Daftar raffle dari semua server (tab Active / Ended), dengan filter untuk pemburu WL.
+// 24 per halaman; tab, filter & nomor halaman disimpan di URL supaya bisa dibagikan.
 export function RafflesListPage() {
   const [params, setParams] = useSearchParams();
+  const ended = params.get("status") === "ended";
+  const SORTS = ended ? ENDED_SORTS : LIVE_SORTS;
   const chain = params.get("chain") ?? "";
-  const open = params.get("open") === "1";
+  const open = !ended && params.get("open") === "1";
   const alloc = params.get("alloc") ?? "";
   const sort = SORTS.some((s) => s.value === params.get("sort")) ? params.get("sort")! : SORTS[0].value;
   const q = params.get("q") ?? "";
@@ -79,6 +85,7 @@ export function RafflesListPage() {
   }, [search, q, update]);
 
   const query = new URLSearchParams({
+    ...(ended && { status: "ended" }),
     sort,
     page: String(page),
     ...(q && { q }),
@@ -122,8 +129,25 @@ export function RafflesListPage() {
       <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold">Find your next allowlist</h1>
-          <div className="mt-1 flex items-center gap-2 text-sm font-medium text-emerald-400">
-            <span className="h-2 w-2 rounded-full bg-emerald-400" /> Live raffles
+          {/* Tab Active / Ended: ganti tab = urutan & filter "Open to everyone" direset, kembali ke halaman 1 */}
+          <div className="mt-3 inline-flex rounded-lg bg-zinc-900 p-1 ring-1 ring-zinc-800" role="tablist">
+            {([
+              [false, "Active"],
+              [true, "Ended"],
+            ] as const).map(([isEnded, label]) => (
+              <button
+                key={label}
+                role="tab"
+                aria-selected={ended === isEnded}
+                onClick={() => ended !== isEnded && update({ status: isEnded ? "ended" : "", sort: "", open: "" })}
+                className={`inline-flex items-center gap-2 rounded-md px-4 py-1.5 text-sm font-medium transition ${
+                  ended === isEnded ? "bg-brand-500 text-zinc-950" : "text-zinc-400 hover:text-zinc-200"
+                }`}
+              >
+                {!isEnded && <span className={`h-2 w-2 rounded-full ${ended ? "bg-emerald-400" : "bg-zinc-950"}`} />}
+                {label}
+              </button>
+            ))}
           </div>
         </div>
         <div className="relative sm:w-72">
@@ -139,9 +163,11 @@ export function RafflesListPage() {
 
       <div className="mb-6 flex flex-wrap items-center gap-2">
         <SlidersHorizontal className="h-4 w-4 text-zinc-500" />
-        <button className={pill(open)} onClick={() => update({ open: open ? "" : "1" })}>
-          <Globe className="h-3.5 w-3.5" /> Open to everyone
-        </button>
+        {!ended && (
+          <button className={pill(open)} onClick={() => update({ open: open ? "" : "1" })}>
+            <Globe className="h-3.5 w-3.5" /> Open to everyone
+          </button>
+        )}
         <button className={pill(alloc === "gtd")} onClick={() => update({ alloc: alloc === "gtd" ? "" : "gtd" })}>
           GTD
         </button>
@@ -192,12 +218,14 @@ export function RafflesListPage() {
       {data?.total === 0 && (
         <div className="card py-12 text-center">
           <Ticket className="mx-auto h-10 w-10 text-zinc-600" strokeWidth={1.5} />
-          <p className="mt-3 text-zinc-400">{filtered ? "No live raffles match your filters." : "No live raffles right now."}</p>
+          <p className="mt-3 text-zinc-400">
+            {filtered ? `No ${ended ? "ended" : "live"} raffles match your filters.` : ended ? "No ended raffles yet." : "No live raffles right now."}
+          </p>
         </div>
       )}
       {data && data.total > 0 && (
         <p className="mb-3 text-xs text-zinc-500">
-          Showing {(data.page - 1) * data.pageSize + 1}–{Math.min(data.page * data.pageSize, data.total)} of {data.total} live raffle
+          Showing {(data.page - 1) * data.pageSize + 1}–{Math.min(data.page * data.pageSize, data.total)} of {data.total} {ended ? "ended" : "live"} raffle
           {data.total === 1 ? "" : "s"}
         </p>
       )}

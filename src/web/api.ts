@@ -72,6 +72,7 @@ export type GuildDetail = {
   channels: { id: string; name: string }[];
   roles: Role[];
   raffles: Raffle[];
+  rafflePage: { page: number; pageSize: number; total: number; totalPages: number };
 };
 export type Entry = {
   id: string;

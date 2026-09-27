@@ -64,7 +64,8 @@ async function loadRaffle(req: Request) {
 
 export const publicRouter = Router();
 
-const PAGE_SIZE = 12; // 4 kolom × 3 baris (desktop), 2 kolom × 6 baris (HP)
+const PAGE_SIZE = 12; // My entries: 4 kolom × 3 baris (desktop), 2 kolom × 6 baris (HP)
+const LIST_PAGE_SIZE = 24; // Daftar raffle Active / Ended: 4 × 6 (desktop), 2 × 12 (HP)
 
 // Angka ringkas untuk landing page (tanpa data pribadi), di-cache 1 menit
 let statsCache: { at: number; data: unknown } | null = null;
@@ -87,22 +88,26 @@ const guildIconUrl = (id: string, icon: string | null) => (icon ? `https://cdn.d
 // Daftar raffle publik: ?status=live (sedang berjalan, yang paling cepat berakhir dulu) atau ended (terbaru dulu).
 // Raffle yang dibatalkan tidak ditampilkan.
 const listQuery = z.object({
+  status: z.enum(["live", "ended"]).catch("live"),
   page: z.coerce.number().int().min(1).max(10_000).catch(1), // mulai dari 1
   q: z.string().trim().max(80).catch(""),
   chain: z.string().max(40).catch(""), // ID chain dari daftar, atau "OTHER" untuk chain manual
   open: z.enum(["1", ""]).catch(""), // 1 = hanya raffle yang tidak wajib join server
   alloc: z.enum(["gtd", "fcfs", ""]).catch(""),
-  sort: z.enum(["ending", "newest", "popular", "odds", ""]).catch(""),
+  sort: z.enum(["ending", "newest", "popular", "odds", "recent", ""]).catch(""),
 });
 
-// Daftar raffle yang sedang live, dengan filter untuk pemburu WL (10 per halaman).
-// Raffle yang sudah selesai tidak ditampilkan di sini; riwayat peserta ada di "My entries".
+// Daftar raffle dengan filter untuk pemburu WL, 24 per halaman.
+// ?status=live = sedang berjalan; ?status=ended = sudah diundi (raffle yang dibatalkan tidak ditampilkan).
+const LIVE_SORTS = ["ending", "newest", "popular", "odds"];
+const ENDED_SORTS = ["recent", "popular"];
 publicRouter.get("/raffles", async (req, res) => {
   const f = listQuery.parse(req.query);
-  const sort = f.sort || "ending";
+  const ended = f.status === "ended";
+  const sorts = ended ? ENDED_SORTS : LIVE_SORTS;
+  const sort = sorts.includes(f.sort) ? f.sort : sorts[0];
   const where: Prisma.RaffleWhereInput = {
-    status: "ACTIVE",
-    endsAt: { gt: new Date() },
+    ...(ended ? { status: "ENDED" } : { status: "ACTIVE", endsAt: { gt: new Date() } }),
     ...(f.q
       ? { OR: [{ title: { contains: f.q, mode: "insensitive" } }, { guildName: { contains: f.q, mode: "insensitive" } }] }
       : {}),
@@ -111,11 +116,11 @@ publicRouter.get("/raffles", async (req, res) => {
       : isChainId(f.chain)
         ? { chain: f.chain }
         : {}),
-    ...(f.open ? { requireMember: false } : {}),
+    ...(f.open && !ended ? { requireMember: false } : {}),
     ...(f.alloc === "gtd" ? { gtdCount: { gt: 0 } } : f.alloc === "fcfs" ? { fcfsCount: { gt: 0 } } : {}),
   };
   const include = { _count: { select: { entries: true } } } as const;
-  const skip = (f.page - 1) * PAGE_SIZE;
+  const skip = (f.page - 1) * LIST_PAGE_SIZE;
 
   let raffles: (Raffle & { _count: { entries: number } })[];
   let total: number;
@@ -125,22 +130,24 @@ publicRouter.get("/raffles", async (req, res) => {
     const odds = (r: (typeof all)[number]) => r.winnerCount / Math.max(1, r._count.entries);
     all.sort((a, b) => odds(b) - odds(a));
     total = all.length;
-    raffles = all.slice(skip, skip + PAGE_SIZE);
+    raffles = all.slice(skip, skip + LIST_PAGE_SIZE);
   } else {
     const orderBy: Prisma.RaffleOrderByWithRelationInput[] =
       sort === "popular"
         ? [{ entries: { _count: "desc" } }, { endsAt: "asc" }]
         : sort === "newest"
           ? [{ createdAt: "desc" }]
-          : [{ endsAt: "asc" }];
+          : sort === "recent"
+            ? [{ endedAt: { sort: "desc", nulls: "last" } }, { endsAt: "desc" }]
+            : [{ endsAt: "asc" }];
     [raffles, total] = await Promise.all([
-      db.raffle.findMany({ where, orderBy, skip, take: PAGE_SIZE, include }),
+      db.raffle.findMany({ where, orderBy, skip, take: LIST_PAGE_SIZE, include }),
       db.raffle.count({ where }),
     ]);
   }
 
   const cards = await toCards(raffles);
-  res.json({ total, page: f.page, pageSize: PAGE_SIZE, totalPages: Math.max(1, Math.ceil(total / PAGE_SIZE)), raffles: cards });
+  res.json({ total, page: f.page, pageSize: LIST_PAGE_SIZE, totalPages: Math.max(1, Math.ceil(total / LIST_PAGE_SIZE)), raffles: cards });
 });
 
 // Data kartu raffle (daftar publik & "My entries")

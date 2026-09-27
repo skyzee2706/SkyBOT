@@ -114,17 +114,24 @@ dashboardRouter.get("/guilds", async (_req, res) => {
   res.json(data);
 });
 
+const GUILD_RAFFLES_PAGE_SIZE = 20;
+
 dashboardRouter.get("/guilds/:guildId", async (req, res) => {
   const guildId = param(req, "guildId");
   const ctx = await requireManager(guildId, userOf(res).id);
-  const [channels, raffles] = await Promise.all([
+  // Daftar raffle server ini: 20 per halaman (?page= mulai dari 1), terbaru dulu
+  const size = GUILD_RAFFLES_PAGE_SIZE;
+  const page = Math.max(1, Math.min(10_000, Number(req.query.page) || 1));
+  const [channels, raffles, total] = await Promise.all([
     fetchTextChannels(guildId),
     db.raffle.findMany({
       where: { guildId },
       orderBy: { createdAt: "desc" },
-      take: 100,
+      skip: (page - 1) * size,
+      take: size,
       include: { _count: { select: { entries: true } } },
     }),
+    db.raffle.count({ where: { guildId } }),
   ]);
   res.json({
     guild: { id: ctx.guild.id, name: ctx.guild.name, icon: ctx.guild.icon },
@@ -143,6 +150,7 @@ dashboardRouter.get("/guilds/:guildId", async (req, res) => {
         assignable: !r.managed && r.position < ctx.botTopPosition,
       })),
     raffles: raffles.map(({ _count, ...r }) => ({ ...r, xPosts: getXPosts(r), entryCount: _count.entries })),
+    rafflePage: { page, pageSize: size, total, totalPages: Math.max(1, Math.ceil(total / size)) },
   });
 });
 

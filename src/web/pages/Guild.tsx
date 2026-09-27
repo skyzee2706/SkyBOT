@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 import { api, guildIcon, type GuildDetail } from "../api";
-import { ErrorBox, formatDate, Loading, RolePicker, StatusBadge } from "../components";
+import { ErrorBox, formatDate, Loading, Pagination, RolePicker, StatusBadge } from "../components";
 import { allocationSummary, chainLabel } from "../../shared/raffle";
 import { ArrowLeft, ChevronDown, Settings } from "lucide-react";
 
@@ -58,10 +58,23 @@ export function GuildPage() {
   const { guildId } = useParams();
   const [data, setData] = useState<GuildDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Nomor halaman di URL (?page=2) supaya tombol Back kembali ke halaman yang sama
+  const [params, setParams] = useSearchParams();
+  const page = Math.max(1, Number(params.get("page")) || 1);
 
   useEffect(() => {
-    api<GuildDetail>(`/guilds/${guildId}`).then(setData).catch((e) => setError(e.message));
-  }, [guildId]);
+    api<GuildDetail>(`/guilds/${guildId}?page=${page}`)
+      .then((d) => {
+        setData(d);
+        if (page > d.rafflePage.totalPages) setParams({}, { replace: true }); // halaman sudah tidak ada
+      })
+      .catch((e) => setError(e.message));
+  }, [guildId, page, setParams]);
+
+  const goTo = (p: number) => {
+    setParams(p === 1 ? {} : { page: String(p) });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
 
   if (error) return <ErrorBox error={error} />;
   if (!data) return <Loading />;
@@ -117,6 +130,7 @@ export function GuildPage() {
           ))}
         </div>
       )}
+      <Pagination page={data.rafflePage.page} totalPages={data.rafflePage.totalPages} onChange={goTo} className="mt-6" />
     </div>
   );
 }
