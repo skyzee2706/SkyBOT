@@ -29,6 +29,9 @@ describe("admin page", () => {
     assert.ok(Array.isArray((await res.json()).attention));
     const session = await (await fetch(`${server.base}/api/admin/session`, { headers: admin })).json();
     assert.deepEqual(session, { enabled: true, loggedIn: true, isAdmin: true });
+    // Admin kedua dari daftar yang dipisah koma (dengan spasi & isian tidak valid di sekitarnya)
+    const second = await login("900000000000000002");
+    assert.equal((await fetch(`${server.base}/api/admin/stats`, { headers: second })).status, 200);
   });
 });
 

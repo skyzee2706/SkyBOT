@@ -24,11 +24,8 @@ const schema = z.object({
   // Diisi otomatis oleh Vercel Cron bila di-set di Project Settings.
   CRON_SECRET: z.string().optional(),
   // ID Discord yang boleh membuka halaman /admin (pisahkan dengan koma). Kosong = halaman admin nonaktif.
-  ADMIN_DISCORD_IDS: z
-    .string()
-    .trim()
-    .regex(/^(\d{17,20}[\s,]*)*$/, "ADMIN_DISCORD_IDS must be Discord user IDs separated by commas")
-    .optional(),
+  // Salah ketik tidak membuat aplikasi gagal start: ID yang tidak valid diabaikan (lihat admin.ts).
+  ADMIN_DISCORD_IDS: z.string().optional(),
   // Webhook Discord (opsional) untuk peringatan, mis. undian yang terputus
   ALERT_WEBHOOK_URL: z
     .string()

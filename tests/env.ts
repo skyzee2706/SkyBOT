@@ -13,6 +13,6 @@ Object.assign(process.env, {
   PUBLIC_URL: "https://skybot.test",
   X_API_KEY: "k",
   X_API_SECRET: "s",
-  ADMIN_DISCORD_IDS: "900000000000000001",
+  ADMIN_DISCORD_IDS: " 900000000000000001, 900000000000000002 ,12345,abc",
   ALERT_WEBHOOK_URL: "",
 });

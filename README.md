@@ -222,7 +222,7 @@ Message History, Mention Everyone** and **Manage Roles**.
 | `QSTASH_*` | Recommended | Exact-time draw scheduling |
 | `CRON_SECRET` | Recommended | Protects the daily safety-net cron |
 | `X_API_KEY`, `X_API_SECRET` | Optional | Enables X tasks |
-| `ADMIN_DISCORD_IDS` | Optional | Discord user IDs (comma separated) that can open `/admin`; empty = disabled |
+| `ADMIN_DISCORD_IDS` | Optional | Discord user IDs that can open `/admin`, separated by commas (e.g. `111…,222…`); empty = disabled |
 | `ALERT_WEBHOOK_URL` | Optional | Discord webhook that receives alerts, e.g. an interrupted draw |
 
 ## Local development

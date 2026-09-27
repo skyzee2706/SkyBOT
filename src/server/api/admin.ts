@@ -9,7 +9,17 @@ import { HttpError } from "./dashboard.js";
 // Halaman /admin: statistik pemakaian SkyBOT. Hanya untuk akun Discord yang ID-nya ada di env ADMIN_DISCORD_IDS
 // (login Discord biasa). Tidak ada PIN yang bisa ditebak atau dipakai untuk mengunci pemilik.
 
-const adminIds = () => new Set((env.ADMIN_DISCORD_IDS ?? "").split(/[\s,]+/).filter(Boolean));
+// Contoh: ADMIN_DISCORD_IDS=123456789012345678,234567890123456789 (boleh pakai spasi setelah koma).
+// ID Discord selalu 17–20 digit; isian lain diabaikan dan dicatat di log supaya mudah ditemukan.
+function parseAdminIds(raw: string | undefined) {
+  const parts = (raw ?? "").split(/[\s,;]+/).filter(Boolean);
+  const valid = parts.filter((p) => /^\d{17,20}$/.test(p));
+  const invalid = parts.filter((p) => !valid.includes(p));
+  if (invalid.length) console.warn(`[admin] ignoring invalid ADMIN_DISCORD_IDS entries: ${invalid.join(", ")}`);
+  return new Set(valid);
+}
+const ADMIN_IDS = parseAdminIds(env.ADMIN_DISCORD_IDS);
+const adminIds = () => ADMIN_IDS;
 
 async function requireAdmin(req: Request, _res: Response, next: NextFunction) {
   const user = await currentUser(req);
