@@ -130,8 +130,8 @@ export function LandingPage() {
           </span>
         </h1>
         <p className="mx-auto mt-5 max-w-xl text-base text-zinc-400 sm:text-lg">
-          Hunt GTD and FCFS spots from NFT projects across every chain, many open to everyone with no Discord join
-          needed. Or run your own raffle for your community in under a minute.
+          Hunt GTD and FCFS spots from NFT projects across every chain, all in one place. Or run your own raffle for your
+          community in under a minute.
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
           <Link to="/raffles" className="btn btn-primary w-full px-6 py-3 text-base sm:w-auto">
