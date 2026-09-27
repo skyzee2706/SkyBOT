@@ -52,9 +52,7 @@ export function withMeta(html: string, meta: { title: string; description: strin
 
 export const ogRouter = Router();
 
-// Link publik (/raffle/:id) dan link halaman manager (/manage/:serverId/raffle/:id) sama-sama menampilkan
-// preview raffle-nya (hanya info publik; halaman manager sendiri tetap butuh login).
-ogRouter.get(["/raffle/:id", "/manage/:guildId/raffle/:id"], async (req, res) => {
+ogRouter.get("/raffle/:id", async (req, res) => {
   const html = await appHtml();
   const raffle = await db.raffle.findUnique({
     where: { id: String(req.params.id) },
