@@ -286,16 +286,41 @@ function EntryPanel({ data, reload }: { data: PublicRaffle; reload: () => void }
     );
   }
 
+  // Belum login: task tetap terlihat (terkunci), dengan ajakan login untuk mulai mengerjakannya
   if (!viewer) {
     return (
-      <div className="card space-y-3 text-center">
-        <div className="font-semibold">Enter this raffle</div>
-        <p className="text-sm text-zinc-400">
-          {r.requireMember
-            ? `Log in with Discord to enter. You must be a member of ${guild?.name ?? "the server"}.`
-            : "Log in with Discord to enter. No need to join the server."}
-        </p>
-        <LoginButton returnTo={returnTo} label="Log in with Discord" />
+      <div className="card space-y-4">
+        <div className="text-center">
+          <div className="font-semibold">Enter this raffle</div>
+          <p className="mt-1 text-sm text-zinc-400">
+            {r.requireMember
+              ? `Log in with Discord to enter. You must be a member of ${guild?.name ?? "the server"}.`
+              : "Log in with Discord to enter. No need to join the server."}
+          </p>
+        </div>
+        {r.tasks.length > 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="font-medium">
+                Tasks <span className="text-zinc-500">({r.tasks.length})</span>
+              </span>
+              <span className="inline-flex items-center gap-1 text-xs text-zinc-500">
+                <Lock className="h-3.5 w-3.5" /> Log in to start
+              </span>
+            </div>
+            {r.tasks.map((t) => (
+              <div
+                key={t.key}
+                className="flex items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-sm text-zinc-400"
+              >
+                <TaskLabel kind={t.kind} label={t.label} />
+                <Lock className="h-4 w-4 text-zinc-600" />
+              </div>
+            ))}
+            {r.quoteCount > 0 && <p className="hint">You'll paste the link to your quote post when you enter.</p>}
+          </div>
+        )}
+        <LoginButton returnTo={returnTo} label={r.tasks.length ? "Log in with Discord to start" : "Log in with Discord"} />
       </div>
     );
   }
