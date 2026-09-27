@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, type Entry, type Raffle } from "../api";
-import { ErrorBox, formatDate, Loading, StatusBadge } from "../components";
+import { ErrorBox, formatDate, Loading, Pagination, StatusBadge } from "../components";
 import { ALLOCATIONS, allocationCount, allocationSummary, chainLabel, hasAllocations, type AllocationType } from "../../shared/raffle";
 import { ArrowLeft, ExternalLink, Globe, Trophy, Users } from "lucide-react";
 import { DiscordMarkdown } from "../DiscordMarkdown";
@@ -15,6 +15,8 @@ const ENTRY_STATUS: Record<Entry["status"], { label: string; cls: string }> = {
   DISQUALIFIED: { label: "Disqualified", cls: "text-red-400" },
 };
 
+const PAGE_SIZE = 20;
+
 export function RafflePage() {
   const { id } = useParams();
   const [data, setData] = useState<{ raffle: Raffle; entries: Entry[] } | null>(null);
@@ -22,6 +24,9 @@ export function RafflePage() {
   const [busy, setBusy] = useState(false);
   const [filter, setFilter] = useState<Filter>("ALL");
   const [search, setSearch] = useState("");
+  const [page, setPage] = useState(1);
+  // Filter / pencarian baru selalu mulai dari halaman 1
+  useEffect(() => setPage(1), [filter, search]);
   const [confirm, setConfirm] = useState<null | "end" | "cancel">(null);
 
   const load = useCallback(() => {
@@ -69,6 +74,10 @@ export function RafflePage() {
         e.wallet?.toLowerCase().includes(q) ||
         e.xUsername?.toLowerCase().includes(q)),
   );
+  // Daftar peserta: 20 per halaman
+  const totalPages = Math.max(1, Math.ceil(shown.length / PAGE_SIZE));
+  const current = Math.min(page, totalPages);
+  const pageRows = shown.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
 
 
   return (
@@ -180,6 +189,9 @@ export function RafflePage() {
       </div>
 
       <div className="card">
+        <h2 className="mb-3 font-semibold">
+          Participants <span className="text-zinc-500">({entries.length})</span>
+        </h2>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex flex-wrap gap-1">
             {filters.map((f) => (
@@ -196,7 +208,7 @@ export function RafflePage() {
         </div>
 
         {shown.length === 0 ? (
-          <p className="py-6 text-center text-sm text-zinc-500">No entries yet.</p>
+          <p className="py-6 text-center text-sm text-zinc-500">{entries.length ? "No participants match." : "No participants yet."}</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-sm">
@@ -212,7 +224,7 @@ export function RafflePage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-zinc-800">
-                {shown.slice(0, 500).map((e) => (
+                {pageRows.map((e) => (
                   <tr key={e.id}>
                     <td className="py-2 pr-4">
                       <div>{e.username}</div>
@@ -262,9 +274,7 @@ export function RafflePage() {
                 ))}
               </tbody>
             </table>
-            {shown.length > 500 && (
-              <p className="mt-3 text-xs text-zinc-500">Showing 500 of {shown.length}.</p>
-            )}
+            <Pagination page={current} totalPages={totalPages} onChange={setPage} className="mt-4" />
           </div>
         )}
       </div>

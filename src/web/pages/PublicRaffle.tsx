@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
@@ -20,7 +20,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { api, loginUrl, setPageTitle } from "../api";
-import { ErrorBox, formatDate, Loading, roleColor, StatusBadge } from "../components";
+import { ErrorBox, formatDate, Loading, Pagination, roleColor, StatusBadge } from "../components";
 import { timeLeft } from "./RafflesList";
 import { DiscordMarkdown } from "../DiscordMarkdown";
 
@@ -206,13 +206,13 @@ export function PublicRafflePage() {
               </a>
             )}
           </div>
-          <Entrants raffleId={r.id} ended={r.status === "ENDED"} total={r.entryCount} />
+          <Participants raffleId={r.id} ended={r.status === "ENDED"} total={r.entryCount} />
         </div>
 
         <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
           {canManage && (
             <Link to={`/r/${r.id}`} className="btn btn-ghost w-full">
-              <Settings className="h-4 w-4" /> Manage raffle (full entrant data)
+              <Settings className="h-4 w-4" /> Manage raffle (full participant data)
             </Link>
           )}
           <EntryPanel data={data} reload={load} />
@@ -465,40 +465,51 @@ function LoginButton({ returnTo, label }: { returnTo: string; label: string }) {
   );
 }
 
-type EntrantRow = { id: string; username: string; avatarUrl: string; winner: "GTD" | "FCFS" | "WINNER" | null };
+type ParticipantRow = { id: string; username: string; avatarUrl: string; winner: "GTD" | "FCFS" | "WINNER" | null };
 
-// Daftar peserta publik: username + foto Discord saja (wallet / X hanya terlihat oleh host di halaman kelola)
-function Entrants({ raffleId, ended, total }: { raffleId: string; ended: boolean; total: number }) {
-  const [rows, setRows] = useState<EntrantRow[] | null>(null);
-  const [page, setPage] = useState(0);
-  const [hasMore, setHasMore] = useState(false);
+// Daftar peserta publik: username + foto Discord saja (wallet / X hanya terlihat oleh host di halaman kelola).
+// 20 per halaman.
+function Participants({ raffleId, ended, total }: { raffleId: string; ended: boolean; total: number }) {
+  const [rows, setRows] = useState<ParticipantRow[] | null>(null);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
   const [busy, setBusy] = useState(false);
+  const topRef = useRef<HTMLDivElement>(null);
 
-  const load = useCallback(
-    async (p: number) => {
-      const d = await api<{ entries: EntrantRow[]; hasMore: boolean }>(`/p/raffles/${raffleId}/entries?page=${p}`);
-      setRows((prev) => (p === 0 ? d.entries : [...(prev ?? []), ...d.entries]));
-      setHasMore(d.hasMore);
-      setPage(p);
-    },
-    [raffleId],
-  );
-  // Muat ulang saat jumlah peserta / status berubah (mis. setelah ikut atau setelah undian)
+  // Muat ulang saat halaman, jumlah peserta atau status berubah (mis. setelah ikut atau setelah undian)
   useEffect(() => {
-    load(0).catch(() => setRows([]));
-  }, [load, total, ended]);
+    let cancelled = false;
+    setBusy(true);
+    api<{ entries: ParticipantRow[]; totalPages: number }>(`/p/raffles/${raffleId}/entries?page=${page}`)
+      .then((d) => {
+        if (cancelled) return;
+        setRows(d.entries);
+        setTotalPages(d.totalPages);
+        if (page > d.totalPages) setPage(d.totalPages);
+      })
+      .catch(() => !cancelled && setRows([]))
+      .finally(() => !cancelled && setBusy(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [raffleId, page, total, ended]);
+
+  const goTo = (p: number) => {
+    setPage(p);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   return (
-    <div className="card">
+    <div ref={topRef} className="card scroll-mt-4">
       <h2 className="mb-3 font-semibold">
-        Entrants <span className="text-zinc-500">({total})</span>
+        Participants <span className="text-zinc-500">({total})</span>
       </h2>
       {!rows ? (
         <Loading />
       ) : rows.length === 0 ? (
         <p className="text-sm text-zinc-500">No one has entered yet. Be the first!</p>
       ) : (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className={`grid gap-2 transition-opacity sm:grid-cols-2 ${busy ? "opacity-50" : ""}`}>
           {rows.map((e) => (
             <div
               key={e.id}
@@ -515,19 +526,7 @@ function Entrants({ raffleId, ended, total }: { raffleId: string; ended: boolean
           ))}
         </div>
       )}
-      {hasMore && (
-        <button
-          className="btn btn-ghost mt-3 w-full"
-          disabled={busy}
-          onClick={async () => {
-            setBusy(true);
-            await load(page + 1).catch(() => {});
-            setBusy(false);
-          }}
-        >
-          {busy ? "Loading..." : "Show more"}
-        </button>
-      )}
+      <Pagination page={page} totalPages={totalPages} onChange={goTo} className="mt-4" />
     </div>
   );
 }

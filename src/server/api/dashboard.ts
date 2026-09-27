@@ -236,7 +236,7 @@ dashboardRouter.post("/guilds/:guildId/raffles", async (req, res) => {
   if (!parsed.success) throw new HttpError(400, parsed.error.issues[0].message);
   const { imageUrl, winnerRoleId, xPosts: postInputs, chain, ...data } = parsed.data;
   if (!data.requireMember && data.requiredRoleIds.length) {
-    throw new HttpError(400, "Required roles only work when entrants must be server members.");
+    throw new HttpError(400, "Required roles only work when participants must be server members.");
   }
   const winnerCount = data.gtdCount + data.fcfsCount;
   if (winnerCount < 1) throw new HttpError(400, "Choose at least one allocation (GTD or FCFS) with 1 or more spots");
@@ -361,7 +361,7 @@ dashboardRouter.get("/raffles/:id/winners.xlsx", async (req, res) => {
     rows.push([`${a} Winners (${group.length})`]);
     rowStyles[rows.length] = "header";
     rows.push(header);
-    rows.push(...(group.length ? group.map(toRow) : [["No eligible entrants"]]));
+    rows.push(...(group.length ? group.map(toRow) : [["No eligible participants"]]));
   }
   res.send(buildXlsx("Winners", rows, { rowStyles }));
 });

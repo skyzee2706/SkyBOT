@@ -36,7 +36,7 @@ function TaskPreview({ value }: { value: XTasksValue }) {
   if (tasks.length === 0) return null;
   return (
     <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-3">
-      <p className="mb-2 text-xs text-zinc-500">Task buttons entrants will see in Discord (click to test):</p>
+      <p className="mb-2 text-xs text-zinc-500">Task buttons participants will see in Discord (click to test):</p>
       <div className="flex flex-wrap gap-2">
         {tasks.map((t) => (
           <a key={t.label} href={t.url} target="_blank" rel="noreferrer" className="btn btn-ghost px-3 py-1.5 text-xs">
@@ -46,7 +46,7 @@ function TaskPreview({ value }: { value: XTasksValue }) {
       </div>
       {posts.some((p) => p.quote) && (
         <p className="mt-2 text-xs text-zinc-500">
-          After quoting, entrants must paste each quote link. Links must come from their connected X account.
+          After quoting, participants must paste each quote link. Links must come from their connected X account.
         </p>
       )}
     </div>

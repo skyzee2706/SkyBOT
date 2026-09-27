@@ -53,14 +53,14 @@ re-verified against Discord, and the results are announced in the channel, split
 - **Chain selection**: Ethereum, Base, Robinhood, Ink, Arc, Unichain, Solana, or any custom chain
 - **Hosted by** line with the host's Discord name and avatar
 - Mention `@everyone` or selected roles when a raffle is posted
-- End early, cancel, or disqualify entrants at any time
+- End early, cancel, or disqualify participants at any time
 
 </td>
 <td width="50%" valign="top">
 
 ### Entry requirements
 - **Server membership**, configurable per raffle (members only, or open to everyone on the web)
-- **Required roles** (entrants need at least one)
+- **Required roles** (participants need at least one)
 - **Minimum Discord account age** to discourage alt accounts
 - **Wallet** matched to the chain: EVM or Solana wallets are saved once per account and reused for every raffle; custom chains (e.g. Zcash, Sui, Aptos) ask for that chain's wallet on each entry
 - **X (Twitter) tasks**: follow, like, retweet and quote, with tracked task links
@@ -76,7 +76,7 @@ re-verified against Discord, and the results are announced in the channel, split
   filters and sorting by ending soon, newest, most entries or **best odds**
 - **My Entries** page (10 per page) to track every raffle entered and every spot won, including past raffles
 - **Enter from the browser** with the same rules as Discord
-- Public **entrant list** (Discord name and avatar only) with winner badges
+- Public **participant list** (Discord name and avatar only, 20 per page) with winner badges
 - **Connect Wallet** and **Connect X** from the account menu, used automatically on every entry
 - Countdown timers, invite-link "Join server" flow, and mobile-friendly layout
 
@@ -85,7 +85,7 @@ re-verified against Discord, and the results are announced in the channel, split
 
 ### Management
 - **Raffle manager roles**: delegate raffle management without Manage Server permission
-- Full entrant data for hosts: wallets, X accounts, quote links
+- Full participant data for hosts (20 per page): wallets, X accounts, quote links
 - **Excel export** of winners with separate GTD and FCFS tables
 - Hidden, PIN-protected **admin statistics** page
 
@@ -257,7 +257,7 @@ docs/                   Logo and screenshots
 
 - Discord interactions are verified with Ed25519 signatures; QStash and cron callbacks are signed as well.
 - Sessions use random, httpOnly cookies. Login and X sign-in redirects only accept internal paths.
-- Public pages show entrants' Discord names and avatars only. Wallets, X accounts and quote links are visible to the
+- Public pages show participants' Discord names and avatars only. Wallets, X accounts and quote links are visible to the
   raffle's hosts and managers.
 - The admin page PIN lives in an environment variable, never in code, and wrong attempts are rate limited.
 - X tasks cannot be verified through the free X API. The bot records that each task link was opened, not that the

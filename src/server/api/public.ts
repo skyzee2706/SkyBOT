@@ -242,33 +242,48 @@ publicRouter.post("/me/wallet", async (req, res) => {
 });
 
 // Daftar peserta publik: hanya username + foto Discord (+ tanda pemenang). Wallet, X & link quote hanya untuk host.
+// 20 per halaman, ?page= mulai dari 1.
+const PARTICIPANTS_PAGE_SIZE = 20;
 publicRouter.get("/raffles/:id/entries", async (req, res) => {
   const raffle = await db.raffle.findUnique({ where: { id: String(req.params.id) }, select: { id: true, status: true } });
   if (!raffle) throw new HttpError(404, "Raffle not found.");
-  const page = Math.max(0, Math.min(10_000, Number(req.query.page) || 0));
-  const size = 100;
+  const size = PARTICIPANTS_PAGE_SIZE;
+  const page = Math.max(1, Math.min(10_000, Number(req.query.page) || 1));
+  const start = (page - 1) * size;
   const select = { id: true, userId: true, username: true, avatar: true, status: true, allocation: true } as const;
-  // Setelah undian: semua pemenang tampil paling atas di halaman pertama (GTD dulu, lalu FCFS),
-  // peserta lain di bawahnya urut waktu ikut. Sebelum undian: semua urut waktu ikut.
+  // Setelah undian: semua pemenang paling atas (GTD dulu, lalu FCFS), peserta lain di bawahnya urut waktu ikut.
+  // Sebelum undian: semua urut waktu ikut. Halaman dihitung dari gabungan kedua daftar itu.
   const ended = raffle.status === "ENDED";
-  const [winners, others, total] = await Promise.all([
-    ended && page === 0
-      ? db.entry.findMany({ where: { raffleId: raffle.id, status: "WON" }, orderBy: [{ allocation: "asc" }, { createdAt: "asc" }], select })
-      : Promise.resolve([]),
-    db.entry.findMany({
-      where: { raffleId: raffle.id, ...(ended ? { status: { not: "WON" as const } } : {}) },
-      orderBy: { createdAt: "asc" },
-      skip: page * size,
-      take: size,
-      select,
-    }),
+  const [total, winnerTotal] = await Promise.all([
     db.entry.count({ where: { raffleId: raffle.id } }),
+    ended ? db.entry.count({ where: { raffleId: raffle.id, status: "WON" } }) : Promise.resolve(0),
   ]);
-  const entries = [...winners, ...others];
+  const winners =
+    start < winnerTotal
+      ? await db.entry.findMany({
+          where: { raffleId: raffle.id, status: "WON" },
+          orderBy: [{ allocation: "asc" }, { createdAt: "asc" }],
+          skip: start,
+          take: size,
+          select,
+        })
+      : [];
+  const othersTake = size - winners.length;
+  const others = othersTake
+    ? await db.entry.findMany({
+        where: { raffleId: raffle.id, ...(ended ? { status: { not: "WON" as const } } : {}) },
+        orderBy: { createdAt: "asc" },
+        skip: Math.max(0, start - winnerTotal),
+        take: othersTake,
+        select,
+      })
+    : [];
   res.json({
     total,
-    hasMore: others.length === size, // halaman penuh = mungkin masih ada lanjutannya
-    entries: entries.map((e) => ({
+    page,
+    pageSize: size,
+    totalPages: Math.max(1, Math.ceil(total / size)),
+    entries: [...winners, ...others].map((e) => ({
       id: e.id,
       username: e.username,
       avatarUrl: discordAvatarUrl(e.userId, e.avatar),

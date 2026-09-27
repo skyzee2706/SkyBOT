@@ -194,7 +194,7 @@ export function CreateRafflePage() {
             label="Allocations"
             required
             error={errors.allocations}
-            hint="Pick GTD, FCFS, or both. With both, GTD winners are drawn first, then FCFS from the remaining entrants."
+            hint="Pick GTD, FCFS, or both. With both, GTD winners are drawn first, then FCFS from the remaining participants."
           >
             <div className="grid gap-2 sm:grid-cols-2">
               {ALLOCATIONS.map((a) => {
@@ -251,7 +251,7 @@ export function CreateRafflePage() {
               }}
             />
             <span>
-              <span className="block text-sm font-medium">Entrants must be members of {data.guild.name}</span>
+              <span className="block text-sm font-medium">Participants must be members of {data.guild.name}</span>
               <span className="hint block">
                 {form.requireMember
                   ? "Non-members can still view the raffle on the web, but must join the server to enter."
@@ -277,7 +277,7 @@ export function CreateRafflePage() {
             label="Required roles (optional)"
             hint={
               form.requireMember
-                ? "Entrants need at least ONE of the selected roles. Leave empty = any member can join."
+                ? "Participants need at least ONE of the selected roles. Leave empty = any member can join."
                 : "Roles can only be checked for server members. Turn on “must be members” to use this."
             }
           >
@@ -303,7 +303,7 @@ export function CreateRafflePage() {
           <div>
             <h2 className="font-semibold">X (Twitter) Tasks</h2>
             <p className="hint">
-              Entrants connect their X account, then complete the tasks via buttons.
+              Participants connect their X account, then complete the tasks via buttons.
             </p>
           </div>
           {!data.xEnabled ? (

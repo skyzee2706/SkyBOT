@@ -85,11 +85,11 @@ export function raffleEmbed(raffle: Raffle, entryCount: number, winners: { userI
     if (hasAllocations(raffle)) {
       for (const a of ALLOCATIONS.filter((a) => allocationCount(raffle, a) > 0)) {
         const ids = winners.filter((w) => w.allocation === a).map((w) => w.userId);
-        embed.addFields({ name: `🏆 ${a} Winners`, value: ids.length ? fitMentions(ids) : "No eligible entrants" });
+        embed.addFields({ name: `🏆 ${a} Winners`, value: ids.length ? fitMentions(ids) : "No eligible participants" });
       }
     } else {
       const ids = winners.map((w) => w.userId);
-      embed.addFields({ name: "🏆 Winners", value: ids.length ? fitMentions(ids) : "No eligible entrants" });
+      embed.addFields({ name: "🏆 Winners", value: ids.length ? fitMentions(ids) : "No eligible participants" });
     }
   }
   // Batas total embed Discord 6000 karakter: kalau lewat, deskripsi yang dipotong.

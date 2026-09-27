@@ -291,7 +291,7 @@ export async function enterRaffle(
   } catch (e) {
     if (isUniqueViolation(e)) {
       return uniqueTarget(e).includes("wallet")
-        ? "❌ That wallet is already used by another entrant in this raffle."
+        ? "❌ That wallet is already used by another participant in this raffle."
         : ALREADY_ENTERED;
     }
     throw e;
@@ -415,7 +415,7 @@ export async function endRaffle(raffleId: string) {
     raffle,
     total
       ? `🎉 **${raffle.title}** has ended! Congratulations to the winners:\n`
-      : `**${raffle.title}** has ended, but no entrants met the requirements.`,
+      : `**${raffle.title}** has ended, but no participants met the requirements.`,
     groups,
   ).catch((e) => console.error("[raffle] failed to announce winners", e));
   console.log(`[raffle] ${raffleId} ended, ${total} winners`);

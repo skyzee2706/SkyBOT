@@ -153,11 +153,21 @@ function pageItems(page: number, totalPages: number): (number | "gap")[] {
   return out;
 }
 
-export function Pagination({ page, totalPages, onChange }: { page: number; totalPages: number; onChange: (p: number) => void }) {
+export function Pagination({
+  page,
+  totalPages,
+  onChange,
+  className = "mt-8",
+}: {
+  page: number;
+  totalPages: number;
+  onChange: (p: number) => void;
+  className?: string;
+}) {
   if (totalPages <= 1) return null;
   const btn = "grid h-9 min-w-9 place-items-center rounded-lg px-3 text-sm transition disabled:cursor-not-allowed disabled:opacity-40";
   return (
-    <nav className="mt-8 flex flex-wrap items-center justify-center gap-1.5" aria-label="Pagination">
+    <nav className={`${className} flex flex-wrap items-center justify-center gap-1.5`} aria-label="Pagination">
       <button className={`${btn} ring-1 ring-zinc-800 hover:ring-brand-500/50`} disabled={page <= 1} onClick={() => onChange(page - 1)}>
         <ChevronLeft className="h-4 w-4" />
         <span className="sr-only">Previous page</span>
